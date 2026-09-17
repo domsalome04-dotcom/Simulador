@@ -1,0 +1,26 @@
+        body { margin: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        #canvas-container { width: 100%; height: 100%; position: relative; overflow: hidden; }
+        #canvas-container canvas { width: 100% !important; height: 100% !important; display: block; outline: none; }
+        .buzzer-alert { animation: parpadeoAlerta 0.4s infinite alternate; }
+        @keyframes parpadeoAlerta { from { background-color: #dc2626; color: white; } to { background-color: #fee2e2; color: #991b1b; } }
+        
+        .signal-graph { display: flex; align-items: flex-end; height: 32px; gap: 2.5px; border-bottom: 1.5px solid #cbd5e1; padding-bottom: 2px; overflow: hidden; }
+        .signal-bar { width: 3.5px; background-color: #e2e8f0; transition: height 0.05s, background-color 0.05s; }
+        .signal-s1 { background-color: #10b981; box-shadow: 0 0 5px #10b981;}
+        .signal-s2 { background-color: #2563eb; box-shadow: 0 0 5px #2563eb;}
+        .signal-both { background-color: #f59e0b; box-shadow: 0 0 6px #f59e0b;} 
+
+        .stop-pin { transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; z-index: 5; }
+        .stop-dot { width: 7px; height: 7px; border-radius: 50%; background: #fff; border: 2px solid #334155; box-shadow: 0 0 0 2px rgba(255,255,255,0.9); }
+        .stop-label { font-size: 8px; font-weight: 800; color: #1e293b; background: rgba(255,255,255,0.95); padding: 1.5px 4px; border-radius: 3px; margin-top: 2px; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+        .stop-pin.stop-active .stop-dot { background: #2563EB; border-color: #2563EB; box-shadow: 0 0 0 4px rgba(37,99,235,0.35); }
+        .stop-pin.stop-active .stop-label { background: #2563EB; color: #fff; }
+
+        .bus-pin { transform: translate(-50%, -100%); z-index: 10; transition: left 0.1s linear, top 0.1s linear; }
+        .bus-pin-badge { width: 24px; height: 24px; border-radius: 50% 50% 50% 0; transform: rotate(45deg); display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 5px rgba(0,0,0,0.35); border: 2px solid #fff; }
+        .bus-pin-badge span { display: block; transform: rotate(-45deg); color: #fff; font-size: 8.5px; font-weight: 900; }
+
+        .fleet-badge { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 6px; color: #fff; font-size: 9.5px; font-weight: 900; }
+        
+        .thin-scroll::-webkit-scrollbar { height: 5px; width: 5px; }
+        .thin-scroll::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
