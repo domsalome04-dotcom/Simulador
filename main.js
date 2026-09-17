@@ -1483,227 +1483,253 @@ import * as THREE from 'three';
         animate();
         drawVerticalLed(0);
         // ==========================================================
-        // 10. FILAS POR RUTA Y SECUENCIA EXPRESS → COMPLETA
-        //     Basado en el mapa del campus: a las 7am la mayoría va a
-        //     FCNM/FCSH (Zona Oeste, trayecto corto) y una minoría a
-        //     FADCOM (Zona Este, al otro lado del lago).
+        // 10. DISTRIBUCIÓN DE LA CONSOLA + FILAS POR RUTA
+        //
+        // Todo va dentro de try/catch independientes: si una parte falla,
+        // las demás siguen funcionando (antes un error cortaba el resto).
         // ==========================================================
 
-        // ---------- 10.1 Señalética de las dos filas ----------
-        function crearLetreroFila(texto, subtexto, colorFondo, x, z) {
-            const cnv = document.createElement('canvas');
-            cnv.width = 256; cnv.height = 96;
-            const cx = cnv.getContext('2d');
-            cx.fillStyle = colorFondo; cx.fillRect(0, 0, 256, 96);
-            cx.fillStyle = '#ffffff'; cx.textAlign = 'center';
-            cx.font = 'bold 26px sans-serif'; cx.fillText(texto, 128, 40);
-            cx.font = 'bold 15px sans-serif'; cx.fillText(subtexto, 128, 70);
-            const tex = new THREE.CanvasTexture(cnv);
-
-            const letrero = new THREE.Mesh(
-                new THREE.PlaneGeometry(2.2, 0.82),
-                new THREE.MeshStandardMaterial({ map: tex })
-            );
-            letrero.position.set(x, 0.55, z);
-            scene.add(letrero);
-
-            const poste = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.05, 0.05, 2.0, 10),
-                new THREE.MeshStandardMaterial({ color: 0x475569 })
-            );
-            poste.position.set(x, -0.5, z);
-            scene.add(poste);
-            return letrero;
-        }
-
-        crearLetreroFila('FILA 1 · RUTA EXPRESS', 'FCNM · FCSH · Básicas', '#15803d', -5.5, 6.2);
-        crearLetreroFila('FILA 2 · RUTA COMPLETA', 'FIEC · Rectorado · FADCOM', '#1d4ed8', 1.5, 6.2);
-
-        // ---------- 10.2 Las dos filas de estudiantes ----------
-        function crearPersonaFila(x, z, sentado) {
-            const g = new THREE.Group();
-            const color = new THREE.Color().setHSL(Math.random(), 0.45, 0.45);
-            const altura = sentado ? 0.5 : 0.85;
-            const cuerpo = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.2, 0.17, altura, 8),
-                new THREE.MeshStandardMaterial({ color })
-            );
-            cuerpo.position.y = altura / 2; cuerpo.castShadow = true; g.add(cuerpo);
-            const cabeza = new THREE.Mesh(
-                new THREE.SphereGeometry(0.15, 12, 12),
-                new THREE.MeshStandardMaterial({ color: 0xffdbac })
-            );
-            cabeza.position.y = altura + 0.13; g.add(cabeza);
-            const mochila = new THREE.Mesh(
-                new THREE.BoxGeometry(0.26, 0.32, 0.16),
-                new THREE.MeshStandardMaterial({ color: 0x1e293b })
-            );
-            mochila.position.set(0, altura * 0.6, -0.2); g.add(mochila);
-            g.position.set(x, -1.5, z);
-            g.rotation.y = -Math.PI / 2 + (Math.random() - 0.5) * 0.35;
-            return g;
-        }
-
-        // Fila Express: mucho más concurrida (hora pico hacia Básicas/FCNM)
-        const filaExpress = [];
-        for (let i = 0; i < 14; i++) {
-            const columna = i % 2;
-            const p = crearPersonaFila(-7.2 + Math.floor(i / 2) * 0.62, 5.5 + columna * 0.62, false);
-            filaExpress.push(p); scene.add(p);
-        }
-
-        // Fila Completa: pocos pasajeros, principalmente hacia FADCOM
-        const filaCompleta = [];
-        for (let i = 0; i < 5; i++) {
-            const p = crearPersonaFila(0.6 + i * 0.62, 5.5, false);
-            filaCompleta.push(p); scene.add(p);
-        }
-
-        function ajustarFilas(nExpress, nCompleta) {
-            filaExpress.forEach((p, i) => { p.visible = i < nExpress; });
-            filaCompleta.forEach((p, i) => { p.visible = i < nCompleta; });
-        }
-
-        // ---------- 10.3 Cartel de ruta sobre el bus ----------
-        const rutaBusCanvas = document.createElement('canvas');
-        rutaBusCanvas.width = 256; rutaBusCanvas.height = 64;
-        const rutaBusCtx = rutaBusCanvas.getContext('2d');
-        const rutaBusTex = new THREE.CanvasTexture(rutaBusCanvas);
-        const rutaBusCartel = new THREE.Sprite(new THREE.SpriteMaterial({ map: rutaBusTex, transparent: true }));
-        rutaBusCartel.scale.set(3.0, 0.75, 1);
-        rutaBusCartel.position.set(-3, 3.4, 1.6);
-        scene.add(rutaBusCartel);
-
-        let rutaActualBus = 'EXPRESS';
-        function dibujarCartelRuta(tipo) {
-            rutaActualBus = tipo;
-            const express = tipo === 'EXPRESS';
-            rutaBusCtx.fillStyle = express ? '#15803d' : '#1d4ed8';
-            rutaBusCtx.fillRect(0, 0, 256, 64);
-            rutaBusCtx.fillStyle = '#ffffff'; rutaBusCtx.textAlign = 'center';
-            rutaBusCtx.font = 'bold 22px sans-serif';
-            rutaBusCtx.fillText(express ? 'RUTA EXPRESS' : 'RUTA COMPLETA', 128, 28);
-            rutaBusCtx.font = 'bold 13px sans-serif';
-            rutaBusCtx.fillText(express ? 'FCNM · FCSH · Básicas' : 'FIEC · Rectorado · FADCOM', 128, 50);
-            rutaBusTex.needsUpdate = true;
-        }
-        dibujarCartelRuta('EXPRESS');
-
-        // ---------- 10.4 Recorrido visible al completarse el aforo ----------
-        // Se engancha a triggerBusDeparture(), que ya se dispara solo cuando
-        // currentPax llega a CAPACITY. Aquí se agrega el viaje visible por las
-        // paradas del mapa y el relevo de la siguiente unidad.
-        const PARADAS_EXPRESS = ['FCNM', 'FCSH'];
-        const PARADAS_COMPLETA = ['FIEC', 'Rectorado', 'FADCOM'];
-
-        const avisoRecorridoCanvas = document.createElement('canvas');
-        avisoRecorridoCanvas.width = 300; avisoRecorridoCanvas.height = 56;
-        const avisoRecorridoCtx = avisoRecorridoCanvas.getContext('2d');
-        const avisoRecorridoTex = new THREE.CanvasTexture(avisoRecorridoCanvas);
-        const avisoRecorrido = new THREE.Sprite(new THREE.SpriteMaterial({ map: avisoRecorridoTex, transparent: true }));
-        avisoRecorrido.scale.set(4.2, 0.78, 1);
-        avisoRecorrido.position.set(-3, 4.3, 2);
-        avisoRecorrido.visible = false;
-        scene.add(avisoRecorrido);
-
-        function mostrarAvisoRecorrido(texto) {
-            if (!texto) { avisoRecorrido.visible = false; return; }
-            avisoRecorridoCtx.fillStyle = 'rgba(15,23,42,0.92)';
-            avisoRecorridoCtx.fillRect(0, 0, 300, 56);
-            avisoRecorridoCtx.fillStyle = '#ffffff'; avisoRecorridoCtx.textAlign = 'center';
-            avisoRecorridoCtx.font = 'bold 17px sans-serif';
-            avisoRecorridoCtx.fillText(texto, 150, 34);
-            avisoRecorridoTex.needsUpdate = true;
-            avisoRecorrido.visible = true;
-        }
-
-        let recorriendo = false;
-        function correrRecorrido() {
-            if (recorriendo) return;
-            recorriendo = true;
-
-            const paradas = rutaActualBus === 'EXPRESS' ? PARADAS_EXPRESS : PARADAS_COMPLETA;
-            let idx = 0;
-
-            const siguienteTramo = () => {
-                if (idx >= paradas.length) {
-                    mostrarAvisoRecorrido('Bus vacío · retornando a Garita');
-                    let volver = 0;
-                    const retorno = setInterval(() => {
-                        volver += 0.5;
-                        busMasterGroup.position.x += 0.5;
-                        if (busMasterGroup.position.x >= 0) {
-                            busMasterGroup.position.x = 0;
-                            clearInterval(retorno);
-                            recorriendo = false;
-                            // Relevo: la unidad siguiente toma la otra ruta
-                            const nuevaRuta = rutaActualBus === 'EXPRESS' ? 'COMPLETA' : 'EXPRESS';
-                            dibujarCartelRuta(nuevaRuta);
-                            ajustarFilas(nuevaRuta === 'EXPRESS' ? 14 : 4, nuevaRuta === 'EXPRESS' ? 5 : 5);
-                            mostrarAvisoRecorrido(
-                                nuevaRuta === 'EXPRESS'
-                                    ? 'Siguiente unidad · RUTA EXPRESS'
-                                    : 'Siguiente unidad · RUTA COMPLETA (llega a FADCOM)'
-                            );
-                            setTimeout(() => mostrarAvisoRecorrido(null), 4000);
-                        }
-                    }, 35);
-                    return;
-                }
-
-                const parada = paradas[idx];
-                mostrarAvisoRecorrido(`${rutaActualBus === 'EXPRESS' ? 'Express' : 'Completa'} · en camino a ${parada}`);
-
-                let avance = 0;
-                const tramo = setInterval(() => {
-                    avance += 0.4;
-                    busMasterGroup.position.x -= 0.4;
-                    if (avance >= 10) {
-                        clearInterval(tramo);
-                        const bajan = Math.min(
-                            Math.ceil(currentPax / (paradas.length - idx)),
-                            currentPax
-                        );
-                        mostrarAvisoRecorrido(`Parada ${parada} · bajan ${bajan} estudiantes`);
-                        let restan = bajan;
-                        const bajada = setInterval(() => {
-                            if (restan <= 0 || currentPax <= 0) {
-                                clearInterval(bajada);
-                                idx++;
-                                setTimeout(siguienteTramo, 1000);
-                                return;
-                            }
-                            const ocupante = seatedPassengers.pop();
-                            if (ocupante) {
-                                ocupante.spot.occupied = false;
-                                ocupante.mesh.traverse(c => {
-                                    if (c.geometry) c.geometry.dispose();
-                                    if (c.material) c.material.dispose();
-                                });
-                                scene.remove(ocupante.mesh);
-                            }
-                            currentPax = Math.max(0, currentPax - 1);
-                            restan--;
-                            updateApp();
-                        }, 80);
-                    }
-                }, 28);
+        // ---------- 10.1 Cada tarjeta de la consola, en su componente ----------
+        // El dock de abajo queda oculto. Sus tarjetas NO se duplican: se mueven
+        // al inspector del elemento correspondiente cuando se hace clic en él,
+        // así que todo el código que ya las actualizaba sigue funcionando igual.
+        try {
+            const TARJETA_POR_COMPONENTE = {
+                DOOR_SENSORS_MODULE: 'card-telemetry-m18',
+                DRIVER_DISPLAY:      'card-telemetry-bus',
+                P10_DISPLAY:         'card-telemetry-p10',
+                BICIPOL_STATION:     'card-telemetry-bicipol',
+                STATION_LED_KIOSK:   'card-telemetry-timer',
+                CENITAL_CAMERA:      'card-telemetry-timer'
             };
 
-            siguienteTramo();
+            const slotVivo = document.getElementById('inspector-live-slot');
+            const dockOculto = document.getElementById('telemetry-dock');
+            if (dockOculto) dockOculto.classList.add('hidden');
+
+            const _inspectComponentBase = inspectComponent;
+            inspectComponent = function (key) {
+                _inspectComponentBase(key);
+                if (!slotVivo) return;
+                // Devuelve la tarjeta anterior a su contenedor original
+                while (slotVivo.firstChild) {
+                    const grid = document.getElementById('telemetry-cards-grid') || dockOculto;
+                    if (grid) grid.appendChild(slotVivo.firstChild);
+                    else slotVivo.removeChild(slotVivo.firstChild);
+                }
+                const idTarjeta = TARJETA_POR_COMPONENTE[key];
+                const tarjeta = idTarjeta ? document.getElementById(idTarjeta) : null;
+                if (tarjeta) slotVivo.appendChild(tarjeta);
+            };
+        } catch (e) {
+            console.warn('[MoveSpol] No se pudo distribuir la consola:', e);
         }
 
-        // Engancha el recorrido al despacho existente sin alterar su código:
-        // se conserva triggerBusDeparture tal cual y solo se extiende.
-        const _triggerBusDepartureOriginal = triggerBusDeparture;
-        triggerBusDeparture = function () {
-            _triggerBusDepartureOriginal();
-            setTimeout(correrRecorrido, 600);
-        };
+        // ---------- 10.2 Dos filas señalizadas por tipo de ruta ----------
+        try {
+            function crearLetreroRuta(texto, subtexto, colorFondo, x, z) {
+                const cnv = document.createElement('canvas');
+                cnv.width = 256; cnv.height = 96;
+                const cx = cnv.getContext('2d');
+                cx.fillStyle = colorFondo; cx.fillRect(0, 0, 256, 96);
+                cx.fillStyle = '#ffffff'; cx.textAlign = 'center';
+                cx.font = 'bold 25px sans-serif'; cx.fillText(texto, 128, 40);
+                cx.font = 'bold 14px sans-serif'; cx.fillText(subtexto, 128, 70);
 
-        // Estado inicial: fila Express llena (hora pico), Completa con pocos
-        ajustarFilas(14, 5);
+                const letrero = new THREE.Mesh(
+                    new THREE.PlaneGeometry(2.4, 0.9),
+                    new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cnv), side: THREE.DoubleSide })
+                );
+                letrero.position.set(x, 0.75, z);
+                sceneGaritaGroup.add(letrero);
 
-        // La consola de operador arranca oculta para despejar la escena
-        const _dockInicial = document.getElementById('telemetry-dock');
-        if (_dockInicial) _dockInicial.classList.add('hidden');
+                const poste = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.05, 0.05, 2.3, 10),
+                    new THREE.MeshStandardMaterial({ color: 0x475569 })
+                );
+                poste.position.set(x, -0.35, z);
+                sceneGaritaGroup.add(poste);
+            }
+
+            function crearPersonaFila(x, z) {
+                const g = new THREE.Group();
+                const color = new THREE.Color().setHSL(Math.random(), 0.5, 0.5);
+                const cuerpo = new THREE.Mesh(
+                    new THREE.CylinderGeometry(0.2, 0.17, 0.85, 8),
+                    new THREE.MeshStandardMaterial({ color })
+                );
+                cuerpo.position.y = 0.42; cuerpo.castShadow = true; g.add(cuerpo);
+                const cabeza = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.15, 12, 12),
+                    new THREE.MeshStandardMaterial({ color: 0xffdbac })
+                );
+                cabeza.position.y = 0.98; g.add(cabeza);
+                const mochila = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.26, 0.32, 0.16),
+                    new THREE.MeshStandardMaterial({ color: 0x1e293b })
+                );
+                mochila.position.set(0, 0.5, -0.2); g.add(mochila);
+                g.position.set(x, -1.5, z);
+                g.rotation.y = Math.PI;              // mirando hacia el bus
+                return g;
+            }
+
+            // Ubicación frente al bus (la puerta está cerca de x=-1, z=1.5),
+            // sobre el andén, para que ambas filas queden siempre a la vista.
+            crearLetreroRuta('RUTA EXPRESS', 'FCNM · FCSH · Básicas', '#15803d', -5.6, 4.6);
+            crearLetreroRuta('RUTA COMPLETA', 'FIEC · Rectorado · FADCOM', '#1d4ed8', 1.6, 4.6);
+
+            window.__filaExpress = [];
+            window.__filaCompleta = [];
+
+            // Fila Express: dos columnas, mucho más concurrida (hora pico)
+            for (let i = 0; i < 16; i++) {
+                const col = i % 2;
+                const p = crearPersonaFila(-6.8 + Math.floor(i / 2) * 0.58, 5.5 + col * 0.65);
+                window.__filaExpress.push(p);
+                sceneGaritaGroup.add(p);
+            }
+            // Fila Completa: pocos pasajeros (FADCOM queda al otro lado del lago)
+            for (let i = 0; i < 5; i++) {
+                const p = crearPersonaFila(0.9 + i * 0.58, 5.5);
+                window.__filaCompleta.push(p);
+                sceneGaritaGroup.add(p);
+            }
+
+            window.ajustarFilas = function (nExpress, nCompleta) {
+                window.__filaExpress.forEach((p, i) => { p.visible = i < nExpress; });
+                window.__filaCompleta.forEach((p, i) => { p.visible = i < nCompleta; });
+            };
+            window.ajustarFilas(16, 5);
+        } catch (e) {
+            console.warn('[MoveSpol] No se pudieron crear las filas:', e);
+        }
+
+        // ---------- 10.3 Cartel de ruta sobre el bus y recorrido al llenarse ----------
+        try {
+            const rutaCanvas = document.createElement('canvas');
+            rutaCanvas.width = 256; rutaCanvas.height = 64;
+            const rutaCtx = rutaCanvas.getContext('2d');
+            const rutaTex = new THREE.CanvasTexture(rutaCanvas);
+            const rutaCartel = new THREE.Sprite(new THREE.SpriteMaterial({ map: rutaTex, transparent: true }));
+            rutaCartel.scale.set(3.2, 0.8, 1);
+            rutaCartel.position.set(-1, 3.6, 1.6);
+            sceneGaritaGroup.add(rutaCartel);
+
+            window.__rutaActual = 'EXPRESS';
+            window.dibujarCartelRuta = function (tipo) {
+                window.__rutaActual = tipo;
+                const ex = tipo === 'EXPRESS';
+                rutaCtx.fillStyle = ex ? '#15803d' : '#1d4ed8';
+                rutaCtx.fillRect(0, 0, 256, 64);
+                rutaCtx.fillStyle = '#ffffff'; rutaCtx.textAlign = 'center';
+                rutaCtx.font = 'bold 22px sans-serif';
+                rutaCtx.fillText(ex ? 'RUTA EXPRESS' : 'RUTA COMPLETA', 128, 27);
+                rutaCtx.font = 'bold 12px sans-serif';
+                rutaCtx.fillText(ex ? 'FCNM · FCSH · Básicas' : 'FIEC · Rectorado · FADCOM', 128, 50);
+                rutaTex.needsUpdate = true;
+            };
+            window.dibujarCartelRuta('EXPRESS');
+
+            // Aviso flotante de lo que está ocurriendo en el recorrido
+            const avisoCanvas = document.createElement('canvas');
+            avisoCanvas.width = 320; avisoCanvas.height = 56;
+            const avisoCtx = avisoCanvas.getContext('2d');
+            const avisoTex = new THREE.CanvasTexture(avisoCanvas);
+            const aviso = new THREE.Sprite(new THREE.SpriteMaterial({ map: avisoTex, transparent: true }));
+            aviso.scale.set(4.4, 0.78, 1);
+            aviso.position.set(-1, 4.5, 2);
+            aviso.visible = false;
+            sceneGaritaGroup.add(aviso);
+
+            function mostrarAviso(texto) {
+                if (!texto) { aviso.visible = false; return; }
+                avisoCtx.fillStyle = 'rgba(15,23,42,0.92)';
+                avisoCtx.fillRect(0, 0, 320, 56);
+                avisoCtx.fillStyle = '#ffffff'; avisoCtx.textAlign = 'center';
+                avisoCtx.font = 'bold 17px sans-serif';
+                avisoCtx.fillText(texto, 160, 34);
+                avisoTex.needsUpdate = true;
+                aviso.visible = true;
+            }
+
+            const PARADAS = {
+                EXPRESS:  ['FCNM', 'FCSH'],
+                COMPLETA: ['FIEC', 'Rectorado', 'FADCOM']
+            };
+            let enRecorrido = false;
+
+            function correrRecorrido() {
+                if (enRecorrido) return;
+                enRecorrido = true;
+                const paradas = PARADAS[window.__rutaActual] || PARADAS.EXPRESS;
+                let idx = 0;
+
+                const tramo = () => {
+                    if (idx >= paradas.length) {
+                        mostrarAviso('Bus vacío · retornando a Garita');
+                        const retorno = setInterval(() => {
+                            busMasterGroup.position.x += 0.5;
+                            if (busMasterGroup.position.x >= 0) {
+                                busMasterGroup.position.x = 0;
+                                clearInterval(retorno);
+                                enRecorrido = false;
+                                // Relevo: la siguiente unidad toma la otra ruta
+                                const nueva = window.__rutaActual === 'EXPRESS' ? 'COMPLETA' : 'EXPRESS';
+                                window.dibujarCartelRuta(nueva);
+                                mostrarAviso(nueva === 'COMPLETA'
+                                    ? 'Siguiente unidad · RUTA COMPLETA (llega a FADCOM)'
+                                    : 'Siguiente unidad · RUTA EXPRESS');
+                                setTimeout(() => mostrarAviso(null), 4500);
+                            }
+                        }, 35);
+                        return;
+                    }
+
+                    const parada = paradas[idx];
+                    mostrarAviso(`${window.__rutaActual === 'EXPRESS' ? 'Express' : 'Completa'} · en camino a ${parada}`);
+                    let avance = 0;
+                    const viaje = setInterval(() => {
+                        avance += 0.4;
+                        busMasterGroup.position.x -= 0.4;
+                        if (avance >= 10) {
+                            clearInterval(viaje);
+                            const bajan = Math.min(Math.ceil(currentPax / (paradas.length - idx)), currentPax);
+                            mostrarAviso(`Parada ${parada} · bajan ${bajan} estudiantes`);
+                            let restan = bajan;
+                            const bajada = setInterval(() => {
+                                if (restan <= 0 || currentPax <= 0) {
+                                    clearInterval(bajada);
+                                    idx++;
+                                    setTimeout(tramo, 1000);
+                                    return;
+                                }
+                                const ocup = seatedPassengers.pop();
+                                if (ocup) {
+                                    ocup.spot.occupied = false;
+                                    ocup.mesh.traverse(c => {
+                                        if (c.geometry) c.geometry.dispose();
+                                        if (c.material) c.material.dispose();
+                                    });
+                                    scene.remove(ocup.mesh);
+                                }
+                                currentPax = Math.max(0, currentPax - 1);
+                                restan--;
+                                updateApp();
+                            }, 80);
+                        }
+                    }, 28);
+                };
+                tramo();
+            }
+
+            // Se engancha al despacho ya existente (que se dispara solo al
+            // llegar al aforo máximo), sin modificar su código original.
+            const _departureBase = triggerBusDeparture;
+            triggerBusDeparture = function () {
+                _departureBase();
+                setTimeout(correrRecorrido, 600);
+            };
+        } catch (e) {
+            console.warn('[MoveSpol] No se pudo preparar el recorrido:', e);
+        }
