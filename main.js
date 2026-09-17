@@ -919,15 +919,54 @@ import * as THREE from 'three';
         // ==========================================
         let activePassengers = [];
 
-        function buildStudentGroup() {
+        // Modelo humanoide con torso, cabeza, brazos, piernas y mochila.
+        // Se usa tanto para los pasajeros que abordan como para las filas.
+        function buildStudentGroup(opciones = {}) {
             const pGroup = new THREE.Group();
-            const bodyColor = new THREE.Color().setHSL(Math.random(), 0.6, 0.6);
-            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.85, 8), new THREE.MeshStandardMaterial({ color: bodyColor }));
-            body.position.y = 0.42; body.castShadow = true; pGroup.add(body);
-            const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffdbac }));
-            head.position.y = 0.9; head.castShadow = true; pGroup.add(head);
-            const pack = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.38, 0.18), new THREE.MeshStandardMaterial({ color: 0x1e293b }));
-            pack.position.set(0, 0.46, -0.22); pGroup.add(pack);
+            const esVisitante = opciones.visitante === true;
+            const bodyColor = esVisitante
+                ? new THREE.Color(0xf59e0b)
+                : new THREE.Color().setHSL(Math.random(), 0.55, 0.55);
+            const pielMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
+            const ropaMat = new THREE.MeshStandardMaterial({ color: bodyColor });
+            const pantalonMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
+
+            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.48, 10), ropaMat);
+            torso.position.y = 0.72; torso.castShadow = true; pGroup.add(torso);
+
+            const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 16), pielMat);
+            cabeza.position.y = 1.08; cabeza.castShadow = true; pGroup.add(cabeza);
+
+            // Brazos (se animan al caminar)
+            const brazoGeo = new THREE.CapsuleGeometry
+                ? new THREE.CylinderGeometry(0.048, 0.042, 0.42, 8)
+                : new THREE.CylinderGeometry(0.048, 0.042, 0.42, 8);
+            const brazoIzq = new THREE.Mesh(brazoGeo, ropaMat);
+            brazoIzq.position.set(-0.21, 0.72, 0); brazoIzq.castShadow = true; pGroup.add(brazoIzq);
+            const brazoDer = new THREE.Mesh(brazoGeo, ropaMat);
+            brazoDer.position.set(0.21, 0.72, 0); brazoDer.castShadow = true; pGroup.add(brazoDer);
+
+            // Piernas (se animan al caminar)
+            const piernaGeo = new THREE.CylinderGeometry(0.058, 0.05, 0.5, 8);
+            const piernaIzq = new THREE.Mesh(piernaGeo, pantalonMat);
+            piernaIzq.position.set(-0.08, 0.24, 0); piernaIzq.castShadow = true; pGroup.add(piernaIzq);
+            const piernaDer = new THREE.Mesh(piernaGeo, pantalonMat);
+            piernaDer.position.set(0.08, 0.24, 0); piernaDer.castShadow = true; pGroup.add(piernaDer);
+
+            // Mochila
+            const mochila = new THREE.Mesh(
+                new THREE.BoxGeometry(0.27, 0.34, 0.15),
+                new THREE.MeshStandardMaterial({ color: esVisitante ? 0x7c2d12 : 0x1e293b })
+            );
+            mochila.position.set(0, 0.74, -0.2); mochila.castShadow = true; pGroup.add(mochila);
+            const correa = new THREE.Mesh(
+                new THREE.BoxGeometry(0.22, 0.04, 0.02),
+                new THREE.MeshStandardMaterial({ color: 0x0f172a })
+            );
+            correa.position.set(0, 0.86, -0.12); pGroup.add(correa);
+
+            // Referencias para animar el caminado
+            pGroup.userData.extremidades = { brazoIzq, brazoDer, piernaIzq, piernaDer };
             return pGroup;
         }
 
@@ -1483,16 +1522,12 @@ import * as THREE from 'three';
         animate();
         drawVerticalLed(0);
         // ==========================================================
-        // 10. DISTRIBUCIÓN DE LA CONSOLA + FILAS POR RUTA
-        //
-        // Todo va dentro de try/catch independientes: si una parte falla,
-        // las demás siguen funcionando (antes un error cortaba el resto).
+        // 10. CONSOLA DISTRIBUIDA, FILAS POR RUTA, CARTELES Y FLUJO GUIADO
+        //     Cada bloque va en su propio try/catch: si uno falla, los demás
+        //     siguen funcionando y el error queda visible en la consola.
         // ==========================================================
 
         // ---------- 10.1 Cada tarjeta de la consola, en su componente ----------
-        // El dock de abajo queda oculto. Sus tarjetas NO se duplican: se mueven
-        // al inspector del elemento correspondiente cuando se hace clic en él,
-        // así que todo el código que ya las actualizaba sigue funcionando igual.
         try {
             const TARJETA_POR_COMPONENTE = {
                 DOOR_SENSORS_MODULE: 'card-telemetry-m18',
@@ -1502,30 +1537,99 @@ import * as THREE from 'three';
                 STATION_LED_KIOSK:   'card-telemetry-timer',
                 CENITAL_CAMERA:      'card-telemetry-timer'
             };
-
             const slotVivo = document.getElementById('inspector-live-slot');
             const dockOculto = document.getElementById('telemetry-dock');
             if (dockOculto) dockOculto.classList.add('hidden');
 
-            const _inspectComponentBase = inspectComponent;
+            const _inspectBase = inspectComponent;
             inspectComponent = function (key) {
-                _inspectComponentBase(key);
+                _inspectBase(key);
                 if (!slotVivo) return;
-                // Devuelve la tarjeta anterior a su contenedor original
                 while (slotVivo.firstChild) {
                     const grid = document.getElementById('telemetry-cards-grid') || dockOculto;
                     if (grid) grid.appendChild(slotVivo.firstChild);
                     else slotVivo.removeChild(slotVivo.firstChild);
                 }
-                const idTarjeta = TARJETA_POR_COMPONENTE[key];
-                const tarjeta = idTarjeta ? document.getElementById(idTarjeta) : null;
+                const idT = TARJETA_POR_COMPONENTE[key];
+                const tarjeta = idT ? document.getElementById(idT) : null;
                 if (tarjeta) slotVivo.appendChild(tarjeta);
             };
-        } catch (e) {
-            console.warn('[MoveSpol] No se pudo distribuir la consola:', e);
-        }
+        } catch (e) { console.warn('[MoveSpol] consola distribuida:', e); }
 
-        // ---------- 10.2 Dos filas señalizadas por tipo de ruta ----------
+        // ---------- 10.2 Marcadores numerados del flujo, visibles en la escena ----------
+        // Cada componente lleva un cartel con su NÚMERO DE PASO. Se ven siempre
+        // desde afuera (no hace falta hacer clic): al avanzar el recorrido
+        // guiado, el marcador del paso activo se ilumina y los demás se atenúan.
+        try {
+            window.__marcadores = {};
+
+            window.crearMarcadorPaso = function (numero, titulo, subtitulo, x, y, z) {
+                const cnv = document.createElement('canvas');
+                cnv.width = 320; cnv.height = 96;
+                const cx = cnv.getContext('2d');
+
+                function pintar(activo) {
+                    cx.clearRect(0, 0, 320, 96);
+                    // Cuerpo del cartel
+                    cx.fillStyle = activo ? '#1d4ed8' : 'rgba(30,41,59,0.55)';
+                    cx.fillRect(0, 0, 320, 96);
+                    cx.strokeStyle = activo ? '#fbbf24' : 'rgba(255,255,255,0.35)';
+                    cx.lineWidth = activo ? 6 : 3;
+                    cx.strokeRect(3, 3, 314, 90);
+                    // Círculo con el número
+                    cx.fillStyle = activo ? '#fbbf24' : 'rgba(255,255,255,0.5)';
+                    cx.beginPath(); cx.arc(48, 48, 30, 0, Math.PI * 2); cx.fill();
+                    cx.fillStyle = activo ? '#1e293b' : '#334155';
+                    cx.font = 'bold 34px sans-serif';
+                    cx.textAlign = 'center'; cx.textBaseline = 'middle';
+                    cx.fillText(String(numero), 48, 50);
+                    // Textos
+                    cx.textAlign = 'left';
+                    cx.fillStyle = activo ? '#ffffff' : 'rgba(255,255,255,0.75)';
+                    cx.font = 'bold 21px sans-serif';
+                    cx.fillText(titulo, 88, 38);
+                    cx.fillStyle = activo ? '#bfdbfe' : 'rgba(255,255,255,0.5)';
+                    cx.font = 'bold 14px sans-serif';
+                    cx.fillText(subtitulo, 88, 66);
+                }
+
+                pintar(false);
+                const tex = new THREE.CanvasTexture(cnv);
+                const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
+                spr.scale.set(2.5, 0.75, 1);
+                spr.position.set(x, y, z);
+                spr.renderOrder = 999;
+                sceneGaritaGroup.add(spr);
+
+                const registro = {
+                    sprite: spr,
+                    activar(activo) {
+                        pintar(activo);
+                        tex.needsUpdate = true;
+                        spr.scale.set(activo ? 3.1 : 2.5, activo ? 0.93 : 0.75, 1);
+                    }
+                };
+                window.__marcadores[numero] = registro;
+                return registro;
+            };
+
+            // Marcadores en cada componente, en el orden real del flujo
+            crearMarcadorPaso(1, 'CÁMARA CENITAL', 'Cuenta la fila en el andén',      -4.3, 4.2, 4.8);
+            crearMarcadorPaso(2, 'LETRERO P10',    'Anuncia la ruta que sale',        -6.2, 3.4, 0.2);
+            crearMarcadorPaso(3, 'SENSOR S0',      'Puerta abierta: habilita conteo', -2.3, 3.1, 1.9);
+            crearMarcadorPaso(4, 'SENSORES S1·S2', 'Detectan cada entrada',           -2.1, 1.5, 1.5);
+            crearMarcadorPaso(5, 'TÓTEM LED',      'Aforo y QR de visitantes',         1.5, 1.6, 5.2);
+            crearMarcadorPaso(6, 'MÓDULO GPS',     'Posición cada 30 s',              -1.0, 4.0, 0.6);
+            crearMarcadorPaso(7, 'BiciPOL',        'Alternativa sin emisiones',        6.2, 0.6, 4.6);
+
+            window.resaltarMarcador = function (numero) {
+                Object.keys(window.__marcadores).forEach(k => {
+                    window.__marcadores[k].activar(Number(k) === numero);
+                });
+            };
+        } catch (e) { console.warn('[MoveSpol] marcadores:', e); }
+
+        // ---------- 10.3 Filas por ruta (sus personas SÍ abordan el bus) ----------
         try {
             function crearLetreroRuta(texto, subtexto, colorFondo, x, z) {
                 const cnv = document.createElement('canvas');
@@ -1535,77 +1639,159 @@ import * as THREE from 'three';
                 cx.fillStyle = '#ffffff'; cx.textAlign = 'center';
                 cx.font = 'bold 25px sans-serif'; cx.fillText(texto, 128, 40);
                 cx.font = 'bold 14px sans-serif'; cx.fillText(subtexto, 128, 70);
-
                 const letrero = new THREE.Mesh(
                     new THREE.PlaneGeometry(2.4, 0.9),
                     new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cnv), side: THREE.DoubleSide })
                 );
-                letrero.position.set(x, 0.75, z);
+                letrero.position.set(x, 0.9, z);
                 sceneGaritaGroup.add(letrero);
-
                 const poste = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.05, 0.05, 2.3, 10),
+                    new THREE.CylinderGeometry(0.05, 0.05, 2.4, 10),
                     new THREE.MeshStandardMaterial({ color: 0x475569 })
                 );
-                poste.position.set(x, -0.35, z);
+                poste.position.set(x, -0.3, z);
                 sceneGaritaGroup.add(poste);
             }
 
-            function crearPersonaFila(x, z) {
-                const g = new THREE.Group();
-                const color = new THREE.Color().setHSL(Math.random(), 0.5, 0.5);
-                const cuerpo = new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.2, 0.17, 0.85, 8),
-                    new THREE.MeshStandardMaterial({ color })
-                );
-                cuerpo.position.y = 0.42; cuerpo.castShadow = true; g.add(cuerpo);
-                const cabeza = new THREE.Mesh(
-                    new THREE.SphereGeometry(0.15, 12, 12),
-                    new THREE.MeshStandardMaterial({ color: 0xffdbac })
-                );
-                cabeza.position.y = 0.98; g.add(cabeza);
-                const mochila = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.26, 0.32, 0.16),
-                    new THREE.MeshStandardMaterial({ color: 0x1e293b })
-                );
-                mochila.position.set(0, 0.5, -0.2); g.add(mochila);
-                g.position.set(x, -1.5, z);
-                g.rotation.y = Math.PI;              // mirando hacia el bus
-                return g;
-            }
-
-            // Ubicación frente al bus (la puerta está cerca de x=-1, z=1.5),
-            // sobre el andén, para que ambas filas queden siempre a la vista.
             crearLetreroRuta('RUTA EXPRESS', 'FCNM · FCSH · Básicas', '#15803d', -5.6, 4.6);
             crearLetreroRuta('RUTA COMPLETA', 'FIEC · Rectorado · FADCOM', '#1d4ed8', 1.6, 4.6);
 
             window.__filaExpress = [];
             window.__filaCompleta = [];
 
-            // Fila Express: dos columnas, mucho más concurrida (hora pico)
-            for (let i = 0; i < 16; i++) {
-                const col = i % 2;
-                const p = crearPersonaFila(-6.8 + Math.floor(i / 2) * 0.58, 5.5 + col * 0.65);
-                window.__filaExpress.push(p);
+            function ponerEnFila(lista, x, z) {
+                const p = buildStudentGroup();
+                p.position.set(x, -1.5, z);
+                p.rotation.y = Math.PI;      // mirando al bus
+                p.userData.enFila = true;
                 sceneGaritaGroup.add(p);
+                lista.push(p);
             }
-            // Fila Completa: pocos pasajeros (FADCOM queda al otro lado del lago)
+            for (let i = 0; i < 16; i++) {
+                ponerEnFila(window.__filaExpress, -6.8 + Math.floor(i / 2) * 0.58, 5.5 + (i % 2) * 0.65);
+            }
             for (let i = 0; i < 5; i++) {
-                const p = crearPersonaFila(0.9 + i * 0.58, 5.5);
-                window.__filaCompleta.push(p);
-                sceneGaritaGroup.add(p);
+                ponerEnFila(window.__filaCompleta, 0.9 + i * 0.58, 5.5);
             }
 
-            window.ajustarFilas = function (nExpress, nCompleta) {
+            // Cuando alguien aborda, se retira una persona de la fila que
+            // corresponde a la ruta activa: la fila se vacía a medida que el
+            // bus se llena, en vez de quedarse intacta.
+            window.sacarDeFila = function () {
+                const lista = (window.__rutaActual === 'COMPLETA')
+                    ? window.__filaCompleta : window.__filaExpress;
+                for (let i = lista.length - 1; i >= 0; i--) {
+                    if (lista[i].visible) { lista[i].visible = false; return true; }
+                }
+                return false;
+            };
+
+            window.reponerFilas = function (nExpress, nCompleta) {
                 window.__filaExpress.forEach((p, i) => { p.visible = i < nExpress; });
                 window.__filaCompleta.forEach((p, i) => { p.visible = i < nCompleta; });
             };
-            window.ajustarFilas(16, 5);
-        } catch (e) {
-            console.warn('[MoveSpol] No se pudieron crear las filas:', e);
-        }
+            window.reponerFilas(16, 5);
 
-        // ---------- 10.3 Cartel de ruta sobre el bus y recorrido al llenarse ----------
+            // Se engancha al alta de pasajeros ya existente
+            const _spawnBase = spawnStudent;
+            spawnStudent = function (dir) {
+                _spawnBase(dir);
+                if (dir === 'in' && window.sacarDeFila) window.sacarDeFila();
+            };
+        } catch (e) { console.warn('[MoveSpol] filas:', e); }
+
+        // ---------- 10.4 Animación de caminado (brazos y piernas) ----------
+        try {
+            (function animarExtremidades() {
+                requestAnimationFrame(animarExtremidades);
+                const t = performance.now() * 0.008;
+                if (!Array.isArray(activePassengers)) return;
+                activePassengers.forEach((p, idx) => {
+                    const ext = p.mesh && p.mesh.userData && p.mesh.userData.extremidades;
+                    if (!ext) return;
+                    const fase = t + idx;
+                    ext.piernaIzq.rotation.x = Math.sin(fase) * 0.55;
+                    ext.piernaDer.rotation.x = -Math.sin(fase) * 0.55;
+                    ext.brazoIzq.rotation.x = -Math.sin(fase) * 0.45;
+                    ext.brazoDer.rotation.x = Math.sin(fase) * 0.45;
+                });
+            })();
+        } catch (e) { console.warn('[MoveSpol] animacion extremidades:', e); }
+
+        // ---------- 10.5 Visitante externo y registro por QR ----------
+        try {
+            window.__qrActivo = false;
+
+            const qrCanvas = document.createElement('canvas');
+            qrCanvas.width = 220; qrCanvas.height = 260;
+            const qrCtx = qrCanvas.getContext('2d');
+            const qrTex = new THREE.CanvasTexture(qrCanvas);
+            const qrPanel = new THREE.Mesh(
+                new THREE.PlaneGeometry(1.5, 1.75),
+                new THREE.MeshBasicMaterial({ map: qrTex, transparent: true })
+            );
+            qrPanel.position.set(1.5, 1.0, 5.05);
+            qrPanel.visible = false;
+            sceneGaritaGroup.add(qrPanel);
+
+            window.dibujarQR = function (registrado) {
+                qrCtx.fillStyle = '#0f172a'; qrCtx.fillRect(0, 0, 220, 260);
+                qrCtx.fillStyle = registrado ? '#16a34a' : '#f59e0b';
+                qrCtx.fillRect(0, 0, 220, 38);
+                qrCtx.fillStyle = '#0f172a'; qrCtx.textAlign = 'center';
+                qrCtx.font = 'bold 14px sans-serif';
+                qrCtx.fillText(registrado ? 'VISITANTE REGISTRADO' : 'VISITANTE DETECTADO', 110, 25);
+
+                if (registrado) {
+                    qrCtx.fillStyle = '#22c55e'; qrCtx.font = 'bold 56px sans-serif';
+                    qrCtx.fillText('✓', 110, 140);
+                    qrCtx.fillStyle = '#ffffff'; qrCtx.font = 'bold 13px sans-serif';
+                    qrCtx.fillText('Datos registrados', 110, 180);
+                    qrCtx.fillStyle = '#cbd5e1'; qrCtx.font = '11px sans-serif';
+                    qrCtx.fillText('Protocolo de seguridad', 110, 200);
+                    qrCtx.fillText('Acceso autorizado al campus', 110, 218);
+                } else {
+                    // QR simulado (patrón determinista, no escaneable real)
+                    const size = 140, ox = 40, oy = 58, cells = 14, cell = size / cells;
+                    qrCtx.fillStyle = '#ffffff'; qrCtx.fillRect(ox - 6, oy - 6, size + 12, size + 12);
+                    qrCtx.fillStyle = '#0f172a';
+                    for (let i = 0; i < cells; i++) {
+                        for (let j = 0; j < cells; j++) {
+                            const esq = (i < 3 && j < 3) || (i < 3 && j > cells - 4) || (i > cells - 4 && j < 3);
+                            if (esq ? (i % 2 === 0 || j % 2 === 0) : ((i * 7 + j * 13) % 3 === 0)) {
+                                qrCtx.fillRect(ox + j * cell, oy + i * cell, cell - 1, cell - 1);
+                            }
+                        }
+                    }
+                    qrCtx.fillStyle = '#fbbf24'; qrCtx.font = 'bold 12px sans-serif';
+                    qrCtx.fillText('Escanea para registrarte', 110, 222);
+                    qrCtx.fillStyle = '#cbd5e1'; qrCtx.font = '10px sans-serif';
+                    qrCtx.fillText('No perteneces a la ESPOL', 110, 240);
+                }
+                qrTex.needsUpdate = true;
+            };
+
+            let visitanteMesh = null;
+            window.mostrarVisitante = function (activo) {
+                window.__qrActivo = activo;
+                qrPanel.visible = activo;
+                if (activo) {
+                    window.dibujarQR(false);
+                    if (!visitanteMesh) {
+                        visitanteMesh = buildStudentGroup({ visitante: true });
+                        sceneGaritaGroup.add(visitanteMesh);
+                    }
+                    visitanteMesh.position.set(2.6, -1.5, 4.3);
+                    visitanteMesh.rotation.y = -Math.PI / 2;  // mirando al tótem
+                    visitanteMesh.visible = true;
+                    setTimeout(() => window.dibujarQR(true), 4000);
+                } else if (visitanteMesh) {
+                    visitanteMesh.visible = false;
+                }
+            };
+        } catch (e) { console.warn('[MoveSpol] visitante QR:', e); }
+
+        // ---------- 10.6 Cartel de ruta del bus y recorrido al llenarse ----------
         try {
             const rutaCanvas = document.createElement('canvas');
             rutaCanvas.width = 256; rutaCanvas.height = 64;
@@ -1631,7 +1817,6 @@ import * as THREE from 'three';
             };
             window.dibujarCartelRuta('EXPRESS');
 
-            // Aviso flotante de lo que está ocurriendo en el recorrido
             const avisoCanvas = document.createElement('canvas');
             avisoCanvas.width = 320; avisoCanvas.height = 56;
             const avisoCtx = avisoCanvas.getContext('2d');
@@ -1642,7 +1827,7 @@ import * as THREE from 'three';
             aviso.visible = false;
             sceneGaritaGroup.add(aviso);
 
-            function mostrarAviso(texto) {
+            window.mostrarAvisoEscena = function (texto) {
                 if (!texto) { aviso.visible = false; return; }
                 avisoCtx.fillStyle = 'rgba(15,23,42,0.92)';
                 avisoCtx.fillRect(0, 0, 320, 56);
@@ -1651,15 +1836,12 @@ import * as THREE from 'three';
                 avisoCtx.fillText(texto, 160, 34);
                 avisoTex.needsUpdate = true;
                 aviso.visible = true;
-            }
-
-            const PARADAS = {
-                EXPRESS:  ['FCNM', 'FCSH'],
-                COMPLETA: ['FIEC', 'Rectorado', 'FADCOM']
             };
+
+            const PARADAS = { EXPRESS: ['FCNM', 'FCSH'], COMPLETA: ['FIEC', 'Rectorado', 'FADCOM'] };
             let enRecorrido = false;
 
-            function correrRecorrido() {
+            window.correrRecorrido = function () {
                 if (enRecorrido) return;
                 enRecorrido = true;
                 const paradas = PARADAS[window.__rutaActual] || PARADAS.EXPRESS;
@@ -1667,27 +1849,26 @@ import * as THREE from 'three';
 
                 const tramo = () => {
                     if (idx >= paradas.length) {
-                        mostrarAviso('Bus vacío · retornando a Garita');
+                        window.mostrarAvisoEscena('Bus vacío · retornando a Garita');
                         const retorno = setInterval(() => {
                             busMasterGroup.position.x += 0.5;
                             if (busMasterGroup.position.x >= 0) {
                                 busMasterGroup.position.x = 0;
                                 clearInterval(retorno);
                                 enRecorrido = false;
-                                // Relevo: la siguiente unidad toma la otra ruta
                                 const nueva = window.__rutaActual === 'EXPRESS' ? 'COMPLETA' : 'EXPRESS';
                                 window.dibujarCartelRuta(nueva);
-                                mostrarAviso(nueva === 'COMPLETA'
+                                window.reponerFilas(nueva === 'EXPRESS' ? 16 : 6, nueva === 'COMPLETA' ? 5 : 5);
+                                window.mostrarAvisoEscena(nueva === 'COMPLETA'
                                     ? 'Siguiente unidad · RUTA COMPLETA (llega a FADCOM)'
                                     : 'Siguiente unidad · RUTA EXPRESS');
-                                setTimeout(() => mostrarAviso(null), 4500);
+                                setTimeout(() => window.mostrarAvisoEscena(null), 4500);
                             }
                         }, 35);
                         return;
                     }
-
                     const parada = paradas[idx];
-                    mostrarAviso(`${window.__rutaActual === 'EXPRESS' ? 'Express' : 'Completa'} · en camino a ${parada}`);
+                    window.mostrarAvisoEscena(`${window.__rutaActual === 'EXPRESS' ? 'Express' : 'Completa'} · en camino a ${parada}`);
                     let avance = 0;
                     const viaje = setInterval(() => {
                         avance += 0.4;
@@ -1695,14 +1876,11 @@ import * as THREE from 'three';
                         if (avance >= 10) {
                             clearInterval(viaje);
                             const bajan = Math.min(Math.ceil(currentPax / (paradas.length - idx)), currentPax);
-                            mostrarAviso(`Parada ${parada} · bajan ${bajan} estudiantes`);
+                            window.mostrarAvisoEscena(`Parada ${parada} · bajan ${bajan} estudiantes`);
                             let restan = bajan;
                             const bajada = setInterval(() => {
                                 if (restan <= 0 || currentPax <= 0) {
-                                    clearInterval(bajada);
-                                    idx++;
-                                    setTimeout(tramo, 1000);
-                                    return;
+                                    clearInterval(bajada); idx++; setTimeout(tramo, 1000); return;
                                 }
                                 const ocup = seatedPassengers.pop();
                                 if (ocup) {
@@ -1714,22 +1892,157 @@ import * as THREE from 'three';
                                     scene.remove(ocup.mesh);
                                 }
                                 currentPax = Math.max(0, currentPax - 1);
-                                restan--;
-                                updateApp();
+                                restan--; updateApp();
                             }, 80);
                         }
                     }, 28);
                 };
                 tramo();
-            }
+            };
 
-            // Se engancha al despacho ya existente (que se dispara solo al
-            // llegar al aforo máximo), sin modificar su código original.
             const _departureBase = triggerBusDeparture;
             triggerBusDeparture = function () {
                 _departureBase();
-                setTimeout(correrRecorrido, 600);
+                setTimeout(window.correrRecorrido, 600);
             };
-        } catch (e) {
-            console.warn('[MoveSpol] No se pudo preparar el recorrido:', e);
-        }
+        } catch (e) { console.warn('[MoveSpol] recorrido:', e); }
+
+        // ---------- 10.7 Recorrido guiado: el flujo completo por pasos ----------
+        try {
+            const PASOS = [
+                {
+                    marcador: 1,
+                    titulo: '1 · La cámara capta cuántos estudiantes esperan',
+                    desc: 'La cámara cenital de Garita está siempre encendida. Cuenta por visión: 16 personas en la fila Express (FCNM/FCSH) y 5 en la fila Completa (FADCOM). Nadie tiene que reportar nada manualmente.',
+                    cam: [-6.5, 5.0, 10.5], target: [-3, 0.5, 4.5],
+                    aviso: 'Cámara: 16 en fila Express · 5 en fila Completa'
+                },
+                {
+                    marcador: 1,
+                    titulo: '2 · El backend decide qué ruta despachar primero',
+                    desc: 'Con ese conteo, y no con un horario fijo, el sistema determina que la demanda de las 7:00 AM está en la Zona Oeste. Resultado: sale primero la Ruta Express, evitando mandar un bus largo con pocos pasajeros.',
+                    cam: [-7.5, 4.2, 9.0], target: [-3, 0.8, 3.5],
+                    aviso: 'Decisión automática: sale primero la RUTA EXPRESS',
+                    accion: () => window.dibujarCartelRuta('EXPRESS')
+                },
+                {
+                    marcador: 2,
+                    titulo: '3 · Se activa el letrero P10 del bus',
+                    desc: 'El chofer confirma con su control RF de 433 MHz y el letrero frontal muestra el destino. Así el estudiante sabe desde lejos cuál unidad le sirve y no aborda la equivocada.',
+                    cam: [-9.0, 3.0, 5.0], target: [-4.5, 1.5, 1.0],
+                    aviso: 'Letrero P10 · RUTA EXPRESS activado'
+                },
+                {
+                    marcador: 3,
+                    titulo: '4 · El sensor S0 habilita el conteo',
+                    desc: 'S0 es un sensor magnético en la puerta. Mientras está cerrada, el conteo permanece apagado para no registrar movimientos internos. Al abrirse, habilita a S1 y S2.',
+                    cam: [-5.0, 2.4, 5.0], target: [-2.3, 1.2, 1.8],
+                    aviso: 'S0: puerta abierta · conteo habilitado'
+                },
+                {
+                    marcador: 4,
+                    titulo: '5 · S1 y S2 detectan cada estudiante que sube',
+                    desc: 'Los dos sensores ópticos están separados 20 cm. La secuencia S1 → ambos → S2 significa entrada; la inversa, salida. Un filtro de 600 ms evita que una mochila se cuente como persona.',
+                    cam: [-5.2, 2.0, 5.2], target: [-2.0, 0.8, 2.0],
+                    aviso: 'Sensores M18 contando: S1 → S2 = +1 pasajero',
+                    accion: () => {
+                        let n = 0;
+                        const subir = setInterval(() => {
+                            if (n >= 8 || currentPax >= CAPACITY) { clearInterval(subir); return; }
+                            spawnStudent('in'); n++;
+                        }, 700);
+                    },
+                    duracion: 9000
+                },
+                {
+                    marcador: 5,
+                    titulo: '6 · El dato sube y se actualiza todo en tiempo real',
+                    desc: 'El ESP32 empaqueta el aforo y lo envía por WiFi cada 15 segundos. El tótem LED del andén y la app del estudiante muestran el mismo número al instante: quien viene caminando ya sabe si alcanzará cupo.',
+                    cam: [3.5, 2.6, 8.5], target: [1.5, 1.0, 5.0],
+                    aviso: 'Aforo sincronizado: tótem LED + app Mi ESPOL'
+                },
+                {
+                    marcador: 5,
+                    titulo: '7 · Un visitante externo se registra por QR',
+                    desc: 'Quien no pertenece a la ESPOL no está en el sistema. El tótem le muestra un código QR y registra sus datos como protocolo de seguridad, sin que tenga que instalar ninguna aplicación.',
+                    cam: [4.5, 2.5, 8.5], target: [1.8, 0.8, 5.0],
+                    aviso: 'Visitante externo · registro por QR',
+                    accion: () => window.mostrarVisitante(true),
+                    duracion: 8500
+                },
+                {
+                    marcador: 6,
+                    titulo: '8 · Aforo completo, despacho y GPS activo',
+                    desc: 'Al llegar a 55 pasajeros el sistema cierra puertas y despacha sin esperar el temporizador. El módulo GPS transmite la posición cada 30 segundos, así la app muestra dónde va la unidad y cuánto falta.',
+                    cam: [-9, 4.5, 11], target: [-1, 1.0, 2.0],
+                    aviso: 'GPS activo · transmitiendo posición cada 30 s',
+                    accion: () => {
+                        window.mostrarVisitante(false);
+                        const btn = document.getElementById('btn-bulk-in');
+                        let k = 0;
+                        const llenar = setInterval(() => {
+                            if (k >= 6 || currentPax >= CAPACITY) { clearInterval(llenar); return; }
+                            if (btn) btn.click();
+                            k++;
+                        }, 500);
+                    },
+                    duracion: 9000
+                },
+                {
+                    marcador: 7,
+                    titulo: '9 · Impacto: tiempo, CO₂ y seguridad',
+                    desc: 'Cada unidad sale llena y por la ruta que la demanda pide: menos viajes vacíos, menos CO₂ y menos espera. BiciPOL cubre los trayectos cortos sin emisiones, y el registro de visitantes más los datos de aforo dan trazabilidad a toda la operación.',
+                    cam: [-10, 6, 14], target: [-2, 1, 3],
+                    aviso: 'Sistema integrado · menos espera y menos CO₂'
+                }
+            ];
+
+            const elBadge = document.getElementById('flow-step-badge');
+            const elTitulo = document.getElementById('flow-step-title');
+            const elDesc = document.getElementById('flow-step-desc');
+            const elProgreso = document.getElementById('flow-progress');
+            const btnFlujo = document.getElementById('btn-flow-start');
+
+            let pasoActual = -1;
+            let temporizadorFlujo = null;
+
+            function pintarPaso(i) {
+                const p = PASOS[i];
+                if (elBadge) elBadge.innerText = `Paso ${i + 1} / ${PASOS.length}`;
+                if (elTitulo) elTitulo.innerText = p.titulo;
+                if (elDesc) elDesc.innerText = p.desc;
+                if (elProgreso) elProgreso.style.width = `${((i + 1) / PASOS.length) * 100}%`;
+
+                // Ilumina en la escena el componente del que habla este paso
+                if (p.marcador && window.resaltarMarcador) window.resaltarMarcador(p.marcador);
+                // Encuadre de cámara hacia ese componente
+                if (p.cam) camera.position.set(p.cam[0], p.cam[1], p.cam[2]);
+                if (p.target) controls.target.set(p.target[0], p.target[1], p.target[2]);
+                // Aviso flotante sobre la escena
+                if (p.aviso && window.mostrarAvisoEscena) window.mostrarAvisoEscena(p.aviso);
+
+                if (p.accion) { try { p.accion(); } catch (err) { console.warn('paso', i, err); } }
+            }
+
+            function siguientePaso() {
+                pasoActual++;
+                if (pasoActual >= PASOS.length) {
+                    if (btnFlujo) btnFlujo.innerText = '▶ Repetir recorrido guiado';
+                    if (window.resaltarMarcador) window.resaltarMarcador(0); // apaga todos
+                    pasoActual = -1;
+                    return;
+                }
+                pintarPaso(pasoActual);
+                const duracion = PASOS[pasoActual].duracion || 7000;
+                temporizadorFlujo = setTimeout(siguientePaso, duracion);
+            }
+
+            if (btnFlujo) {
+                btnFlujo.addEventListener('click', () => {
+                    if (temporizadorFlujo) clearTimeout(temporizadorFlujo);
+                    pasoActual = -1;
+                    btnFlujo.innerText = '■ Reiniciar recorrido';
+                    siguientePaso();
+                });
+            }
+        } catch (e) { console.warn('[MoveSpol] flujo guiado:', e); }
