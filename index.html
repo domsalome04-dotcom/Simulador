@@ -73,34 +73,42 @@
             </div>
         </div>
 
-        <!-- ENCABEZADO SUPERIOR: CONTROLES DE DEMOSTRACIÓN -->
+        <!-- BARRA SUPERIOR: RECORRIDO GUIADO Y ACCIONES SIMPLES -->
         <div class="absolute top-4 left-4 z-20 flex flex-wrap gap-2.5 items-center">
-            <div class="bg-white/95 backdrop-blur-md p-1.5 rounded-2xl border border-slate-200 shadow-lg flex items-center gap-1 text-slate-800">
-                <button id="btn-scene-garita" class="bg-blue-600 text-white px-3 py-1.5 rounded-xl text-[11px] font-black transition shadow-sm">
-                    📍 Parada Garita
+
+            <!-- Control del recorrido guiado (fuera del mockup: es lo externo) -->
+            <div class="bg-white/95 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200 shadow-lg flex items-center gap-3 text-slate-800">
+                <button id="btn-flow-start" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[12px] font-black transition shadow-sm">
+                    ▶ Ver cómo funciona
                 </button>
-                <button id="btn-scene-terminal" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl text-[11px] font-black transition">
-                    🏛️ Escenario Terminal
-                </button>
+                <div class="min-w-[230px]">
+                    <div class="flex items-center justify-between gap-2">
+                        <span id="flow-step-title" class="text-[11px] font-black text-slate-900 leading-tight">Listo para iniciar</span>
+                        <span id="flow-step-badge" class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded shrink-0">0 / 9</span>
+                    </div>
+                    <p id="flow-step-desc" class="text-[9.5px] text-slate-600 leading-snug mt-0.5">Muestra paso a paso cómo trabajan la cámara, los sensores, el GPS y las pantallas.</p>
+                    <div class="w-full bg-slate-200 rounded-full h-1 overflow-hidden mt-1">
+                        <div id="flow-progress" class="bg-blue-600 h-full transition-all duration-500" style="width:0%"></div>
+                    </div>
+                </div>
             </div>
 
             <div class="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-200 shadow-lg flex items-center gap-2 text-slate-800">
-                <button id="btn-in" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm flex items-center gap-1">
-                    <span>+1</span> Entra (S1&rarr;S2)
+                <button id="btn-in" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm">
+                    Sube un estudiante
                 </button>
-                <button id="btn-out" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm flex items-center gap-1">
-                    <span>-1</span> Sale (S2&rarr;S1)
+                <button id="btn-out" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm">
+                    Baja un estudiante
                 </button>
                 <button id="btn-bulk-in" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm">
-                    ⚡ Llenar Lote (+10)
+                    Sube un grupo
                 </button>
             </div>
 
-            <!-- Consola Operador: se mantiene el botón pero oculto, para no saturar
-                 la vista. El dock sigue existiendo y puede reactivarse desde aquí. -->
-            <button id="btn-toggle-telemetry" class="hidden bg-white/95 text-slate-700 hover:text-slate-900 border border-slate-200 shadow-lg px-3 py-2 rounded-2xl text-[11px] font-black transition flex items-center gap-1.5">
-                <span>📊</span> Consola Operador
-            </button>
+            <!-- Ocultos: se conservan para no romper el código que los usa -->
+            <button id="btn-scene-garita" class="hidden"></button>
+            <button id="btn-scene-terminal" class="hidden"></button>
+            <button id="btn-toggle-telemetry" class="hidden"></button>
         </div>
 
         <!-- DASHBOARD INFERIOR DE TELEMETRÍA IOT -->
@@ -246,22 +254,6 @@
             <!-- PESTAÑA: BUSES EN TIEMPO REAL -->
             <div id="app-view-buses" class="flex flex-col flex-grow overflow-hidden bg-white">
                 
-                <!-- FLUJO DEL SISTEMA PASO A PASO -->
-                <div class="px-3.5 py-2 bg-slate-900 text-white shrink-0">
-                    <div class="flex justify-between items-center mb-1.5">
-                        <span class="text-[10.5px] font-black uppercase tracking-wide">Flujo del sistema MoveSpol</span>
-                        <span id="flow-step-badge" class="text-[9px] font-bold bg-blue-600 px-1.5 py-0.5 rounded">Paso 0 / 7</span>
-                    </div>
-                    <p id="flow-step-title" class="text-[12px] font-black text-blue-300 leading-tight">Listo para iniciar</p>
-                    <p id="flow-step-desc" class="text-[9.5px] text-slate-300 leading-snug mt-0.5 min-h-[28px]">Pulsa “Iniciar recorrido guiado” para ver cómo trabajan juntos la cámara, los sensores, el GPS y las pantallas.</p>
-                    <div class="w-full bg-slate-700 rounded-full h-1 overflow-hidden mt-1.5">
-                        <div id="flow-progress" class="bg-blue-500 h-full transition-all duration-500" style="width:0%"></div>
-                    </div>
-                    <button id="btn-flow-start" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-black text-[10.5px] py-1.5 rounded-xl transition">
-                        ▶ Iniciar recorrido guiado
-                    </button>
-                </div>
-
                 <!-- MAPA DEL CAMPUS ESPOL -->
                 <div class="mx-3.5 my-2 rounded-2xl overflow-hidden border border-slate-200 shrink-0 shadow-sm relative bg-slate-50">
                     <div class="relative w-full" style="height:215px;">

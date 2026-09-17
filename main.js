@@ -39,6 +39,12 @@ import * as THREE from 'three';
         ground.rotation.x = -Math.PI / 2; ground.position.y = -1.5; ground.receiveShadow = true; scene.add(ground);
 
         // Grupos de Escenarios
+        // FIX CRÍTICO: 'currentSceneMode' se usaba en drawVerticalLed() pero nunca
+        // se declaraba. Al llamar drawVerticalLed(0) al final del script lanzaba
+        // ReferenceError y CORTABA toda la ejecución posterior (por eso no se veían
+        // los cambios en estudiantes, filas ni el botón de recorrido guiado).
+        let currentSceneMode = 'GARITA';
+
         const sceneGaritaGroup = new THREE.Group();
         const sceneTerminalGroup = new THREE.Group();
         scene.add(sceneGaritaGroup);
@@ -1382,6 +1388,7 @@ import * as THREE from 'three';
 
         if (btnSceneGarita) {
             btnSceneGarita.addEventListener('click', () => {
+                currentSceneMode = 'GARITA';
                 sceneGaritaGroup.visible = true;
                 sceneTerminalGroup.visible = false;
                 btnSceneGarita.className = "bg-blue-600 text-white px-3 py-1.5 rounded-xl text-[11px] font-black transition shadow-sm";
@@ -1393,6 +1400,7 @@ import * as THREE from 'three';
 
         if (btnSceneTerminal) {
             btnSceneTerminal.addEventListener('click', () => {
+                currentSceneMode = 'TERMINAL';
                 sceneGaritaGroup.visible = false;
                 sceneTerminalGroup.visible = true;
                 btnSceneTerminal.className = "bg-blue-600 text-white px-3 py-1.5 rounded-xl text-[11px] font-black transition shadow-sm";
@@ -2046,3 +2054,78 @@ import * as THREE from 'three';
                 });
             }
         } catch (e) { console.warn('[MoveSpol] flujo guiado:', e); }
+
+        // ---------- 10.8 Segunda unidad en andén (la que sale después) ----------
+        // Muestra el relevo: mientras U1 se llena, U2 espera detrás con su propio
+        // letrero de ruta y movimiento de pasajeros subiendo y bajando.
+        try {
+            const busRelevo = busMasterGroup.clone(true);
+            busRelevo.name = 'BUS_RELEVO';
+            busRelevo.position.set(14.5, 0, 0);   // detrás del primero, en el andén
+            sceneGaritaGroup.add(busRelevo);
+
+            // Cartel de ruta del segundo bus (siempre la ruta contraria)
+            const relevoCanvas = document.createElement('canvas');
+            relevoCanvas.width = 256; relevoCanvas.height = 64;
+            const relevoCtx = relevoCanvas.getContext('2d');
+            const relevoTex = new THREE.CanvasTexture(relevoCanvas);
+            const relevoCartel = new THREE.Sprite(new THREE.SpriteMaterial({ map: relevoTex, transparent: true }));
+            relevoCartel.scale.set(3.2, 0.8, 1);
+            relevoCartel.position.set(13.5, 3.6, 1.6);
+            sceneGaritaGroup.add(relevoCartel);
+
+            window.dibujarCartelRelevo = function () {
+                const esCompleta = window.__rutaActual === 'EXPRESS'; // el relevo lleva la otra
+                relevoCtx.fillStyle = esCompleta ? '#1d4ed8' : '#15803d';
+                relevoCtx.fillRect(0, 0, 256, 64);
+                relevoCtx.fillStyle = '#ffffff'; relevoCtx.textAlign = 'center';
+                relevoCtx.font = 'bold 20px sans-serif';
+                relevoCtx.fillText(esCompleta ? 'U2 · RUTA COMPLETA' : 'U2 · RUTA EXPRESS', 128, 26);
+                relevoCtx.font = 'bold 12px sans-serif';
+                relevoCtx.fillText(esCompleta ? 'Siguiente salida · llega a FADCOM' : 'Siguiente salida · FCNM / FCSH', 128, 50);
+                relevoTex.needsUpdate = true;
+            };
+            window.dibujarCartelRelevo();
+
+            // Pasajeros yendo y viniendo alrededor del bus de relevo
+            const genteRelevo = [];
+            for (let i = 0; i < 6; i++) {
+                const p = buildStudentGroup();
+                p.position.set(12.5 + (i % 3) * 0.9, -1.5, 3.2 + Math.floor(i / 3) * 0.9);
+                p.rotation.y = Math.PI;
+                sceneGaritaGroup.add(p);
+                genteRelevo.push({
+                    mesh: p,
+                    fase: Math.random() * Math.PI * 2,
+                    subiendo: i % 2 === 0
+                });
+            }
+
+            (function animarRelevo() {
+                requestAnimationFrame(animarRelevo);
+                const t = performance.now() * 0.0012;
+                genteRelevo.forEach((g, i) => {
+                    // Va y viene entre el andén y la puerta del bus de relevo
+                    const ciclo = (Math.sin(t + g.fase) + 1) / 2;   // 0 a 1
+                    const zDestino = g.subiendo ? 3.4 - ciclo * 1.7 : 1.7 + ciclo * 1.7;
+                    g.mesh.position.z = zDestino;
+                    g.mesh.rotation.y = g.subiendo ? Math.PI : 0;
+                    // Piernas y brazos en movimiento
+                    const ext = g.mesh.userData && g.mesh.userData.extremidades;
+                    if (ext) {
+                        const paso = performance.now() * 0.008 + i;
+                        ext.piernaIzq.rotation.x = Math.sin(paso) * 0.5;
+                        ext.piernaDer.rotation.x = -Math.sin(paso) * 0.5;
+                        ext.brazoIzq.rotation.x = -Math.sin(paso) * 0.4;
+                        ext.brazoDer.rotation.x = Math.sin(paso) * 0.4;
+                    }
+                });
+            })();
+
+            // Al cambiar la ruta del bus principal, el relevo actualiza la suya
+            const _cartelBase = window.dibujarCartelRuta;
+            window.dibujarCartelRuta = function (tipo) {
+                _cartelBase(tipo);
+                if (window.dibujarCartelRelevo) window.dibujarCartelRelevo();
+            };
+        } catch (e) { console.warn('[MoveSpol] bus de relevo:', e); }
