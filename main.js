@@ -1752,10 +1752,8 @@ import * as THREE from 'three';
             rutaCanvas.width = 256; rutaCanvas.height = 64;
             const rutaCtx = rutaCanvas.getContext('2d');
             const rutaTex = new THREE.CanvasTexture(rutaCanvas);
-            const rutaCartel = new THREE.Sprite(new THREE.SpriteMaterial({ map: rutaTex, transparent: true }));
-            rutaCartel.scale.set(3.2, 0.8, 1);
-            rutaCartel.position.set(-1, 3.6, 1.6);
-            sceneGaritaGroup.add(rutaCartel);
+            // El cartel flotante se retiró: la ruta se comunica por la pantalla
+            // LED del bus y el tótem del andén, no con un letrero sobrepuesto.
 
             window.__rutaActual = 'EXPRESS';
             window.dibujarCartelRuta = function (tipo) {
@@ -1876,10 +1874,7 @@ import * as THREE from 'three';
             relevoCanvas.width = 256; relevoCanvas.height = 64;
             const relevoCtx = relevoCanvas.getContext('2d');
             const relevoTex = new THREE.CanvasTexture(relevoCanvas);
-            const relevoCartel = new THREE.Sprite(new THREE.SpriteMaterial({ map: relevoTex, transparent: true }));
-            relevoCartel.scale.set(3.2, 0.8, 1);
-            relevoCartel.position.set(13.5, 3.6, 1.6);
-            sceneGaritaGroup.add(relevoCartel);
+            // Sin cartel flotante: la unidad de relevo también informa por su LED.
 
             window.dibujarCartelRelevo = function () {
                 const esCompleta = window.__rutaActual === 'EXPRESS'; // el relevo lleva la otra
@@ -1928,25 +1923,28 @@ import * as THREE from 'three';
             };
         } catch (e) { console.warn('[MoveSpol] bus de relevo:', e); }
 
+
         // ==========================================================
-        // 11. PRESENTACIÓN CINEMÁTICA (se reproduce sola, sin botones)
-        //     Cada paso: acerca la cámara al componente, muestra SOLO su
-        //     cartel y su descripción, y luego vuelve a la vista general.
+        // 11. GUÍA INTERACTIVA: el usuario llena el Express, sale, y sigue
+        //     el Completa. Los números aparecen de a uno sobre el elemento
+        //     que corresponde al paso en curso.
         // ==========================================================
         try {
-            const elTitulo  = document.getElementById('scene-title');
-            const elCaption = document.getElementById('scene-caption');
-            const elPaso    = document.getElementById('caption-step');
-            const elCapTit  = document.getElementById('caption-title');
-            const elCapDesc = document.getElementById('caption-desc');
-            const elProg    = document.getElementById('flow-progress');
+            const gPaso  = document.getElementById('caption-step');
+            const gTit   = document.getElementById('caption-title');
+            const gDesc  = document.getElementById('caption-desc');
+            const gProg  = document.getElementById('flow-progress');
+            const gCtrl  = document.getElementById('user-controls');
+            const gHint  = document.getElementById('user-hint');
+            const gTurno = document.getElementById('bus-turno');
+            const gCierre = document.getElementById('panel-cierre');
 
-            // --- Cámara con movimiento suave (efecto de video) ---
+            // Cámara con desplazamiento suave
             let camAnim = null;
-            function volarCamara(pos, target, ms = 2200) {
+            function volarCamara(pos, tgt, ms = 1800) {
                 camAnim = {
                     p0: camera.position.clone(), p1: new THREE.Vector3(pos[0], pos[1], pos[2]),
-                    t0: controls.target.clone(), t1: new THREE.Vector3(target[0], target[1], target[2]),
+                    t0: controls.target.clone(), t1: new THREE.Vector3(tgt[0], tgt[1], tgt[2]),
                     ini: performance.now(), dur: ms
                 };
             }
@@ -1960,152 +1958,165 @@ import * as THREE from 'three';
                 if (k >= 1) camAnim = null;
             })();
 
-            const VISTA_GENERAL = { pos: [-11, 6.5, 15], tgt: [-1, 0.8, 3] };
-
-            // --- Solo se ve el cartel del paso activo ---
-            function soloMarcador(nums) {
+            // Solo el número del paso actual queda visible
+            function soloNumero(nums) {
                 if (!window.__marcadores) return;
                 Object.keys(window.__marcadores).forEach(k => {
-                    const activo = Array.isArray(nums) ? nums.includes(Number(k)) : Number(k) === nums;
+                    const on = Array.isArray(nums) ? nums.includes(Number(k)) : Number(k) === nums;
                     const m = window.__marcadores[k];
-                    m.sprite.visible = activo;
-                    m.activar(activo);
+                    m.sprite.visible = on;
+                    m.activar(on);
                 });
             }
-            soloMarcador([]);   // al inicio, ningún cartel
+            soloNumero([]);
 
-            function mostrarCaption(n, total, titulo, desc) {
-                if (elPaso) elPaso.textContent = `Paso ${n} de ${total}`;
-                if (elCapTit) elCapTit.textContent = titulo;
-                if (elCapDesc) elCapDesc.textContent = desc;
-                if (elCaption) elCaption.classList.remove('opacity-0');
+            function habilitarControles(on, hint) {
+                if (gCtrl) {
+                    gCtrl.classList.toggle('opacity-30', !on);
+                    gCtrl.classList.toggle('pointer-events-none', !on);
+                }
+                if (gHint) gHint.textContent = hint || '';
             }
-            function ocultarCaption() { if (elCaption) elCaption.classList.add('opacity-0'); }
 
-            // --- Guion de la presentación ---
-            const ESCENAS = [
+            // --- Guion: cada paso puede esperar una acción del usuario ---
+            let paso = 0;
+            const PASOS = [
                 {
-                    titulo: 'La parada Garita a las 7:00 AM',
-                    desc: 'Dos filas esperan: la mayoría va a FCNM y FCSH (trayecto corto), y un grupo menor va a FADCOM, al otro lado del lago. Veamos cómo el sistema decide qué hacer.',
-                    marcadores: [], vista: VISTA_GENERAL, dur: 6500
+                    num: [1],
+                    titulo: 'La cámara cenital detecta la fila',
+                    desc: 'Desde arriba cuenta a quienes esperan sin que se tapen entre sí. Ve 16 personas hacia FCNM/FCSH y 5 hacia FADCOM.',
+                    vista: [[-5.5, 5.2, 8.5], [-4.3, 1.5, 4.8]],
+                    auto: 6000,
+                    accion: () => {
+                        habilitarControles(false);
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Cámara contando: 16 Express · 5 Completa');
+                    }
                 },
                 {
-                    titulo: 'La cámara cenital cuenta la fila',
-                    desc: 'Desde arriba, sin que nadie se tape entre sí, la cámara cuenta a quienes esperan. Detecta 16 personas hacia la Zona Oeste y 5 hacia FADCOM.',
-                    marcadores: [1], vista: { pos: [-5.5, 5.2, 8.5], tgt: [-4.3, 1.5, 4.8] }, dur: 7500,
-                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Detectando: 16 + 5 personas'); }
-                },
-                {
-                    titulo: 'Caso A · Demanda alta: sale la Ruta Express',
-                    desc: 'El algoritmo compara el conteo con el aforo de 55. Con 16 personas concentradas hacia FCNM, conviene despachar primero la Express: llena el bus rápido y evita un recorrido largo casi vacío.',
-                    marcadores: [1, 2], vista: { pos: [-8.5, 4.0, 7.5], tgt: [-4.5, 1.5, 2.5] }, dur: 8000,
+                    num: [1, 2],
+                    titulo: 'El algoritmo decide qué ruta sale primero',
+                    desc: 'Compara el conteo con el aforo de 55. Con la demanda concentrada hacia la Zona Oeste, despacha primero la Ruta Express y lo anuncia en la pantalla LED del bus.',
+                    vista: [[-8.5, 4.0, 7.0], [-4.5, 1.5, 2.0]],
+                    auto: 6500,
                     accion: () => {
                         if (window.dibujarCartelRuta) window.dibujarCartelRuta('EXPRESS');
-                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Aforo estimado 16/55 · alta concentración → EXPRESS');
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Decisión: EXPRESS primero · anunciado en LED');
                     }
                 },
                 {
-                    titulo: 'Caso B · Demanda baja: se espera o sale la Completa',
-                    desc: 'Si la cámara detecta pocas personas, el sistema no despacha en vacío: mantiene la unidad en andén o la manda por la Ruta Completa, que recoge en todas las paradas. Así se evita quemar combustible sin pasajeros.',
-                    marcadores: [1, 2], vista: { pos: [-8.5, 4.0, 7.5], tgt: [-4.5, 1.5, 2.5] }, dur: 8000,
-                    accion: () => {
-                        if (window.reponerFilas) window.reponerFilas(4, 3);
-                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Aforo estimado 7/55 · baja demanda → esperar / COMPLETA');
-                    }
-                },
-                {
-                    titulo: 'El letrero P10 anuncia la ruta',
-                    desc: 'El chofer confirma con su control de radiofrecuencia y el letrero frontal muestra el destino. El estudiante sabe desde lejos qué unidad le sirve y no aborda la equivocada.',
-                    marcadores: [2], vista: { pos: [-9.5, 2.8, 4.0], tgt: [-5.5, 1.8, 0.5] }, dur: 7000,
-                    accion: () => {
-                        if (window.reponerFilas) window.reponerFilas(16, 5);
-                        if (window.dibujarCartelRuta) window.dibujarCartelRuta('EXPRESS');
-                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Letrero P10 · RUTA EXPRESS');
-                    }
-                },
-                {
-                    titulo: 'Sensor S0: la puerta habilita el conteo',
-                    desc: 'S0 es un sensor magnético en la puerta. Cerrada, el conteo está apagado para no registrar movimientos internos. Al abrirse, enciende a S1 y S2.',
-                    marcadores: [3], vista: { pos: [-4.5, 2.6, 4.5], tgt: [-2.3, 1.4, 1.8] }, dur: 7000,
+                    num: [3],
+                    titulo: 'S0 abre la puerta y habilita el conteo',
+                    desc: 'El sensor magnético de la puerta enciende a S1 y S2. A partir de aquí, cada persona que cruce será contada.',
+                    vista: [[-4.5, 2.6, 4.5], [-2.3, 1.4, 1.8]],
+                    auto: 5500,
                     accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('S0 = puerta abierta · conteo ON'); }
                 },
                 {
-                    titulo: 'S1 y S2 forman el vector de dirección',
-                    desc: 'Los dos sensores están separados 20 cm. El sistema lee un par de bits: [0,0] → [1,0] → [1,1] → [0,1] → [0,0] significa ENTRADA. En orden inverso, salida. Un filtro de 600 ms evita contar una mochila como persona.',
-                    marcadores: [4], vista: { pos: [-4.2, 1.9, 4.2], tgt: [-2.1, 0.9, 1.6] }, dur: 11000,
+                    num: [4],
+                    titulo: 'Tu turno: llena el bus Express',
+                    desc: 'Usa los botones de abajo. Cada estudiante que sube forma el vector [0,0]→[1,0]→[1,1]→[0,1]→[0,0] en S1 y S2: eso es una entrada. Llena hasta 55 para despacharlo.',
+                    vista: [[-6.0, 2.6, 6.0], [-2.1, 1.0, 2.0]],
+                    esperaLleno: true,
                     accion: () => {
-                        let n = 0;
-                        const t = setInterval(() => {
-                            if (n >= 6 || currentPax >= CAPACITY) { clearInterval(t); return; }
-                            spawnStudent('in'); n++;
-                            if (window.mostrarAvisoEscena) {
-                                window.mostrarAvisoEscena(`S1 → ambos → S2 = +1 · aforo ${currentPax}/${CAPACITY}`);
-                            }
-                        }, 1400);
+                        habilitarControles(true, 'Pulsa “Llenado masivo” o “Sube un estudiante” hasta llegar a 55/55');
+                        if (gTurno) {
+                            gTurno.textContent = 'Cargando U1 · RUTA EXPRESS (FCNM / FCSH)';
+                            gTurno.className = 'absolute bottom-5 left-1/2 -translate-x-1/2 z-30 bg-emerald-600 text-white text-[11.5px] font-black px-4 py-2 rounded-xl shadow-2xl';
+                        }
                     }
                 },
                 {
-                    titulo: 'Las tres pantallas muestran el mismo dato',
-                    desc: 'El ESP32 envía el aforo por WiFi. La pantalla del chofer indica cuántos lleva y cuándo cerrar; el letrero del bus muestra la ruta; y el tótem del andén publica el conteo y qué unidad sale primero, para quien no tiene la app.',
-                    marcadores: [3, 5], vista: { pos: [2.5, 2.8, 8.0], tgt: [0.5, 1.2, 4.0] }, dur: 9000,
-                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Chofer · letrero del bus · tótem del andén'); }
-                },
-                {
-                    titulo: 'Aforo completo y despacho automático',
-                    desc: 'Al llegar a 55 pasajeros el sistema cierra puertas y despacha sin esperar el temporizador. El GPS empieza a transmitir la posición cada 30 segundos.',
-                    marcadores: [6], vista: { pos: [-10, 4.5, 10], tgt: [-1.5, 1.2, 2.0] }, dur: 9000,
+                    num: [3, 5],
+                    titulo: 'Aforo lleno: aviso de cierre y buzzer',
+                    desc: 'Al llegar a 55 la pantalla del chofer se pone en rojo y suena el buzzer en cabina: debe cerrar puertas y salir. El tótem del andén ya anuncia la siguiente unidad.',
+                    vista: [[-8, 3.4, 7.5], [-2, 1.4, 2.5]],
+                    auto: 6500,
                     accion: () => {
-                        const b = document.getElementById('btn-bulk-in');
-                        let k = 0;
-                        const t = setInterval(() => {
-                            if (k >= 6 || currentPax >= CAPACITY) { clearInterval(t); return; }
-                            if (b) b.click(); k++;
-                        }, 600);
-                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('GPS transmitiendo cada 30 s');
+                        habilitarControles(false);
+                        if (gCierre) gCierre.classList.remove('opacity-0');
+                        setTimeout(() => { if (gCierre) gCierre.classList.add('opacity-0'); }, 5000);
                     }
                 },
                 {
-                    titulo: 'La siguiente unidad toma la otra ruta',
-                    desc: 'Mientras la primera sale, la unidad de relevo ya espera en el andén con su letrero puesto. Así quien va a FADCOM siempre sabe que la Completa viene detrás de la Express.',
-                    marcadores: [], vista: { pos: [6, 4.5, 12], tgt: [8, 1.0, 2.0] }, dur: 8000,
-                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('U2 en andén · ruta contraria lista'); }
+                    num: [6],
+                    titulo: 'Sale el Express y entra el Completa',
+                    desc: 'La unidad parte con el GPS transmitiendo cada 30 segundos. La de relevo toma el andén con la Ruta Completa, la que sí llega hasta FADCOM.',
+                    vista: [[-9, 4.5, 11], [0, 1.2, 2.0]],
+                    auto: 7000,
+                    accion: () => {
+                        if (window.dibujarCartelRuta) window.dibujarCartelRuta('COMPLETA');
+                        if (window.reponerFilas) window.reponerFilas(4, 12);
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('U1 en ruta · GPS activo · U2 toma el andén');
+                        if (gTurno) {
+                            gTurno.textContent = 'Cargando U2 · RUTA COMPLETA (FIEC · Rectorado · FADCOM)';
+                            gTurno.className = 'absolute bottom-5 left-1/2 -translate-x-1/2 z-30 bg-blue-700 text-white text-[11.5px] font-black px-4 py-2 rounded-xl shadow-2xl';
+                        }
+                    }
                 },
                 {
+                    num: [4],
+                    titulo: 'Ahora llena el bus de Ruta Completa',
+                    desc: 'Mismo procedimiento: los sensores cuentan uno por uno. Este bus recoge en todas las paradas, así que quien va a FADCOM aborda aquí.',
+                    vista: [[-6.0, 2.6, 6.0], [-2.1, 1.0, 2.0]],
+                    esperaLleno: true,
+                    accion: () => habilitarControles(true, 'Llena la segunda unidad hasta 55/55')
+                },
+                {
+                    num: [5],
                     titulo: 'Si llega alguien externo a la ESPOL',
-                    desc: 'Un visitante no aparece en el sistema. El tótem le muestra un código QR: lo escanea, registra sus datos y queda autorizado. Es el protocolo de seguridad, sin instalar ninguna aplicación.',
-                    marcadores: [5], vista: { pos: [4.2, 2.4, 8.2], tgt: [1.8, 1.0, 5.0] }, dur: 10000,
-                    accion: () => { if (window.mostrarVisitante) window.mostrarVisitante(true); }
+                    desc: 'El sistema no lo reconoce. El tótem le muestra un QR: lo escanea, registra sus datos y queda autorizado. Es el protocolo de seguridad, sin instalar ninguna app.',
+                    vista: [[4.2, 2.4, 8.2], [1.8, 1.0, 5.0]],
+                    auto: 9000,
+                    accion: () => {
+                        habilitarControles(false);
+                        if (window.mostrarVisitante) window.mostrarVisitante(true);
+                    }
                 },
                 {
-                    titulo: 'BiciPOL cubre los trayectos cortos',
-                    desc: 'Para distancias cortas entre facultades, la estación de bicicletas evita ocupar un cupo del bus y no genera emisiones. Garita y Rectorado mantienen el mismo número de anclajes.',
-                    marcadores: [7], vista: { pos: [8.5, 2.2, 8.0], tgt: [6.2, 0.4, 4.6] }, dur: 8000,
-                    accion: () => { if (window.mostrarVisitante) window.mostrarVisitante(false); }
-                },
-                {
+                    num: [7],
                     titulo: 'Resultado: menos espera y menos CO₂',
-                    desc: 'Cada unidad sale llena y por la ruta que la demanda pide. Se eliminan los viajes vacíos, baja el tiempo de espera y todo queda registrado: aforo real por parada y visitantes identificados.',
-                    marcadores: [], vista: VISTA_GENERAL, dur: 9000,
-                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena(null); }
+                    desc: 'Cada unidad salió llena y por la ruta que la demanda pidió. BiciPOL cubre los trayectos cortos sin emisiones y todo queda registrado: aforo real y visitantes identificados.',
+                    vista: [[-11, 6.5, 15], [-1, 0.8, 3]],
+                    auto: 9000,
+                    accion: () => {
+                        if (window.mostrarVisitante) window.mostrarVisitante(false);
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena(null);
+                    }
                 }
             ];
 
-            let idx = -1;
-            function siguienteEscena() {
-                idx++;
-                if (idx >= ESCENAS.length) { idx = 0; }      // se repite en bucle
-                const e = ESCENAS[idx];
-
-                if (elTitulo) elTitulo.textContent = e.titulo;
-                if (elProg) elProg.style.width = `${((idx + 1) / ESCENAS.length) * 100}%`;
-                mostrarCaption(idx + 1, ESCENAS.length, e.titulo, e.desc);
-                soloMarcador(e.marcadores || []);
-                if (e.vista) volarCamara(e.vista.pos, e.vista.tgt, 2200);
-                if (e.accion) { try { e.accion(); } catch (err) { console.warn('escena', idx, err); } }
-
-                setTimeout(siguienteEscena, e.dur || 7000);
+            function pintar(i) {
+                const p = PASOS[i];
+                if (gPaso) gPaso.textContent = `Paso ${i + 1} de ${PASOS.length}`;
+                if (gTit) gTit.textContent = p.titulo;
+                if (gDesc) gDesc.textContent = p.desc;
+                if (gProg) gProg.style.width = `${((i + 1) / PASOS.length) * 100}%`;
+                soloNumero(p.num || []);
+                if (p.vista) volarCamara(p.vista[0], p.vista[1]);
+                if (p.accion) { try { p.accion(); } catch (err) { console.warn('paso', i, err); } }
+                if (p.auto) setTimeout(avanzar, p.auto);
             }
 
-            // Arranca sola, sin que el usuario toque nada
-            setTimeout(siguienteEscena, 1800);
-        } catch (e) { console.warn('[MoveSpol] presentación:', e); }
+            function avanzar() {
+                paso++;
+                if (paso >= PASOS.length) { paso = 0; if (window.reponerFilas) window.reponerFilas(16, 5); }
+                pintar(paso);
+            }
+
+            // Los pasos que esperan al usuario avanzan cuando el bus se llena
+            window.__avisarBusLleno = function () {
+                const p = PASOS[paso];
+                if (p && p.esperaLleno) setTimeout(avanzar, 1200);
+            };
+
+            setTimeout(() => pintar(0), 1200);
+        } catch (e) { console.warn('[MoveSpol] guía interactiva:', e); }
+
+        // Engancha el aviso de "lleno" al despacho ya existente
+        try {
+            const _depBase2 = triggerBusDeparture;
+            triggerBusDeparture = function () {
+                _depBase2();
+                if (window.__avisarBusLleno) window.__avisarBusLleno();
+            };
+        } catch (e) { console.warn('[MoveSpol] enganche lleno:', e); }

@@ -73,40 +73,61 @@
             </div>
         </div>
 
-        <!-- TÍTULO DE LA PRESENTACIÓN (sin botones: se reproduce solo) -->
-        <div class="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-[640px] max-w-[90%] text-center pointer-events-none">
-            <div class="bg-slate-900/85 backdrop-blur-md rounded-2xl px-5 py-3 shadow-2xl">
-                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-300">Sistema MoveSpol · Campus Gustavo Galindo</p>
-                <h1 id="scene-title" class="text-[17px] font-black text-white leading-tight mt-0.5">Cómo funciona el sistema, paso a paso</h1>
-                <div class="w-full bg-white/15 rounded-full h-1 overflow-hidden mt-2">
-                    <div id="flow-progress" class="bg-blue-400 h-full transition-all duration-700" style="width:0%"></div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SUBTÍTULO DEL PASO ACTUAL (estilo video) -->
-        <div id="scene-caption" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 w-[680px] max-w-[92%] opacity-0 transition-opacity duration-500 pointer-events-none">
-            <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl px-5 py-3 shadow-2xl border-l-4 border-blue-500">
+        <!-- GUÍA DE PASOS + CONTROLES DEL USUARIO -->
+        <div class="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-[700px] max-w-[92%]">
+            <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl px-5 py-3 shadow-2xl">
                 <div class="flex items-center gap-2 mb-1">
-                    <span id="caption-step" class="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded">Paso 1</span>
-                    <span id="caption-title" class="text-[13px] font-black text-white"></span>
+                    <span id="caption-step" class="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded shrink-0">Paso 1 de 8</span>
+                    <span id="caption-title" class="text-[14px] font-black text-white leading-tight">La cámara detecta la fila</span>
                 </div>
-                <p id="caption-desc" class="text-[11.5px] text-slate-200 leading-snug"></p>
+                <p id="caption-desc" class="text-[11.5px] text-slate-200 leading-snug">Observa el número 1 sobre la cámara cenital: está contando cuántos estudiantes esperan en cada fila.</p>
+                <div class="w-full bg-white/15 rounded-full h-1 overflow-hidden mt-2">
+                    <div id="flow-progress" class="bg-blue-400 h-full transition-all duration-500" style="width:12%"></div>
+                </div>
+            </div>
+
+            <!-- Botones: aparecen solo cuando el paso los necesita -->
+            <div id="user-controls" class="flex justify-center gap-2 mt-2 opacity-30 pointer-events-none transition-opacity duration-300">
+                <button id="btn-in" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold shadow-lg transition">
+                    Sube un estudiante
+                </button>
+                <button id="btn-out" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold shadow-lg transition">
+                    Baja un estudiante
+                </button>
+                <button id="btn-bulk-in" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold shadow-lg transition">
+                    Sube un grupo (+10)
+                </button>
+            </div>
+            <p id="user-hint" class="text-center text-[10px] font-bold text-white/90 mt-1.5 drop-shadow"></p>
+        </div>
+
+        <!-- Unidad en turno -->
+        <div id="bus-turno" class="absolute bottom-5 left-1/2 -translate-x-1/2 z-30 bg-emerald-600 text-white text-[11.5px] font-black px-4 py-2 rounded-xl shadow-2xl">
+            Cargando U1 · RUTA EXPRESS (FCNM / FCSH)
+        </div>
+
+        <!-- Aviso de aforo máximo + buzzer -->
+        <div id="panel-cierre" class="absolute top-32 left-1/2 -translate-x-1/2 z-40 opacity-0 pointer-events-none transition-opacity duration-300">
+            <div class="bg-red-600 text-white rounded-2xl px-5 py-3 shadow-2xl border-2 border-amber-300 flex items-center gap-3 buzzer-alert">
+                <span class="text-2xl">🔔</span>
+                <div>
+                    <p class="text-[13px] font-black leading-tight">AFORO MÁXIMO 55/55 · CERRAR PUERTAS</p>
+                    <p class="text-[10px] font-bold opacity-90">Buzzer activo en cabina · el chofer cierra y sale</p>
+                </div>
             </div>
         </div>
 
-        <!-- Controles ocultos: el código los usa, pero no se muestran -->
+        <!-- Controles ocultos que el código usa -->
         <div class="hidden">
-            <button id="btn-in"></button>
-            <button id="btn-out"></button>
-            <button id="btn-bulk-in"></button>
             <button id="btn-scene-garita"></button>
             <button id="btn-scene-terminal"></button>
             <button id="btn-toggle-telemetry"></button>
             <button id="btn-flow-start"></button>
+            <span id="scene-title"></span>
             <span id="flow-step-title"></span>
             <span id="flow-step-badge"></span>
             <span id="flow-step-desc"></span>
+            <div id="scene-caption"></div>
         </div>
 
         <!-- DASHBOARD INFERIOR DE TELEMETRÍA IOT -->
