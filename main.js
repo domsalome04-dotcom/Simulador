@@ -1571,7 +1571,7 @@ import * as THREE from 'three';
         try {
             window.__marcadores = {};
 
-            window.crearMarcadorPaso = function (numero, titulo, subtitulo, x, y, z) {
+            function crearMarcadorPaso(numero, titulo, subtitulo, x, y, z) {
                 const cnv = document.createElement('canvas');
                 cnv.width = 320; cnv.height = 96;
                 const cx = cnv.getContext('2d');
@@ -1635,6 +1635,7 @@ import * as THREE from 'three';
                     window.__marcadores[k].activar(Number(k) === numero);
                 });
             };
+            window.crearMarcadorPaso = crearMarcadorPaso;
         } catch (e) { console.warn('[MoveSpol] marcadores:', e); }
 
         // ---------- 10.3 Filas por ruta (sus personas SÍ abordan el bus) ----------
@@ -2016,9 +2017,9 @@ import * as THREE from 'three';
 
             function pintarPaso(i) {
                 const p = PASOS[i];
-                if (elBadge) elBadge.innerText = `Paso ${i + 1} / ${PASOS.length}`;
-                if (elTitulo) elTitulo.innerText = p.titulo;
-                if (elDesc) elDesc.innerText = p.desc;
+                if (elBadge) elBadge.textContent = `${i + 1} / ${PASOS.length}`;
+                if (elTitulo) elTitulo.textContent = p.titulo;
+                if (elDesc) elDesc.textContent = p.desc;
                 if (elProgreso) elProgreso.style.width = `${((i + 1) / PASOS.length) * 100}%`;
 
                 // Ilumina en la escena el componente del que habla este paso
@@ -2035,7 +2036,7 @@ import * as THREE from 'three';
             function siguientePaso() {
                 pasoActual++;
                 if (pasoActual >= PASOS.length) {
-                    if (btnFlujo) btnFlujo.innerText = '▶ Repetir recorrido guiado';
+                    if (btnFlujo) btnFlujo.textContent = '▶ Ver de nuevo';
                     if (window.resaltarMarcador) window.resaltarMarcador(0); // apaga todos
                     pasoActual = -1;
                     return;
@@ -2049,7 +2050,7 @@ import * as THREE from 'three';
                 btnFlujo.addEventListener('click', () => {
                     if (temporizadorFlujo) clearTimeout(temporizadorFlujo);
                     pasoActual = -1;
-                    btnFlujo.innerText = '■ Reiniciar recorrido';
+                    btnFlujo.textContent = '■ Reiniciar';
                     siguientePaso();
                 });
             }
