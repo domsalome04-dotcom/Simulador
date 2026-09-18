@@ -1536,39 +1536,30 @@ import * as THREE from 'three';
             window.__marcadores = {};
 
             function crearMarcadorPaso(numero, titulo, subtitulo, x, y, z) {
+                // Solo un círculo con el número: sin letreros de texto, para no
+                // saturar la escena. La explicación va en la barra de pasos.
                 const cnv = document.createElement('canvas');
-                cnv.width = 320; cnv.height = 96;
+                cnv.width = 128; cnv.height = 128;
                 const cx = cnv.getContext('2d');
 
                 function pintar(activo) {
-                    cx.clearRect(0, 0, 320, 96);
-                    // Cuerpo del cartel
-                    cx.fillStyle = activo ? '#1d4ed8' : 'rgba(30,41,59,0.55)';
-                    cx.fillRect(0, 0, 320, 96);
-                    cx.strokeStyle = activo ? '#fbbf24' : 'rgba(255,255,255,0.35)';
-                    cx.lineWidth = activo ? 6 : 3;
-                    cx.strokeRect(3, 3, 314, 90);
-                    // Círculo con el número
-                    cx.fillStyle = activo ? '#fbbf24' : 'rgba(255,255,255,0.5)';
-                    cx.beginPath(); cx.arc(48, 48, 30, 0, Math.PI * 2); cx.fill();
-                    cx.fillStyle = activo ? '#1e293b' : '#334155';
-                    cx.font = 'bold 34px sans-serif';
+                    cx.clearRect(0, 0, 128, 128);
+                    cx.beginPath(); cx.arc(64, 64, 52, 0, Math.PI * 2);
+                    cx.fillStyle = activo ? '#fbbf24' : 'rgba(148,163,184,0.55)';
+                    cx.fill();
+                    cx.lineWidth = 7;
+                    cx.strokeStyle = activo ? '#ffffff' : 'rgba(255,255,255,0.5)';
+                    cx.stroke();
+                    cx.fillStyle = activo ? '#0f172a' : '#1e293b';
+                    cx.font = 'bold 62px sans-serif';
                     cx.textAlign = 'center'; cx.textBaseline = 'middle';
-                    cx.fillText(String(numero), 48, 50);
-                    // Textos
-                    cx.textAlign = 'left';
-                    cx.fillStyle = activo ? '#ffffff' : 'rgba(255,255,255,0.75)';
-                    cx.font = 'bold 21px sans-serif';
-                    cx.fillText(titulo, 88, 38);
-                    cx.fillStyle = activo ? '#bfdbfe' : 'rgba(255,255,255,0.5)';
-                    cx.font = 'bold 14px sans-serif';
-                    cx.fillText(subtitulo, 88, 66);
+                    cx.fillText(String(numero), 64, 68);
                 }
 
                 pintar(false);
                 const tex = new THREE.CanvasTexture(cnv);
                 const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
-                spr.scale.set(2.5, 0.75, 1);
+                spr.scale.set(0.72, 0.72, 1);
                 spr.position.set(x, y, z);
                 spr.renderOrder = 999;
                 sceneGaritaGroup.add(spr);
@@ -1576,14 +1567,13 @@ import * as THREE from 'three';
                 const registro = {
                     sprite: spr,
                     activar(activo) {
-                        pintar(activo);
-                        tex.needsUpdate = true;
-                        spr.scale.set(activo ? 3.1 : 2.5, activo ? 0.93 : 0.75, 1);
+                        pintar(activo); tex.needsUpdate = true;
+                        spr.scale.set(activo ? 0.95 : 0.72, activo ? 0.95 : 0.72, 1);
                     }
                 };
                 window.__marcadores[numero] = registro;
                 return registro;
-            };
+            }
 
             // Marcadores en cada componente, en el orden real del flujo
             crearMarcadorPaso(1, 'CÁMARA CENITAL', 'Cuenta la fila en el andén',      -4.3, 4.2, 4.8);
@@ -2033,8 +2023,9 @@ import * as THREE from 'three';
                     auto: 6500,
                     accion: () => {
                         habilitarControles(false);
-                        if (gCierre) gCierre.classList.remove('opacity-0');
-                        setTimeout(() => { if (gCierre) gCierre.classList.add('opacity-0'); }, 5000);
+                        // El aviso de cierre y el buzzer se comunican aquí mismo,
+                        // en la barra de pasos, sin letreros flotantes extra.
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena(null);
                     }
                 },
                 {
@@ -2044,8 +2035,7 @@ import * as THREE from 'three';
                     vista: [[-9, 4.5, 11], [0, 1.2, 2.0]],
                     auto: 7000,
                     accion: () => {
-                        if (window.dibujarCartelRuta) window.dibujarCartelRuta('COMPLETA');
-                        if (window.reponerFilas) window.reponerFilas(4, 12);
+                        if (window.avanzarTurnoBus) window.avanzarTurnoBus();
                         if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('U1 en ruta · GPS activo · U2 toma el andén');
                         if (gTurno) {
                             gTurno.textContent = 'Cargando U2 · RUTA COMPLETA (FIEC · Rectorado · FADCOM)';
@@ -2120,3 +2110,105 @@ import * as THREE from 'three';
                 if (window.__avisarBusLleno) window.__avisarBusLleno();
             };
         } catch (e) { console.warn('[MoveSpol] enganche lleno:', e); }
+
+        // ==========================================================
+        // 12. CLIC PRECISO Y CORRECCIÓN DEL DESPACHO
+        // ==========================================================
+
+        // ---------- 12.1 Hotspots: un único punto clickeable por elemento ----------
+        // Antes se podía hacer clic en cualquier parte del grupo (la puerta, todo
+        // el poste, toda la estación) y eso disparaba el zoom por error. Ahora
+        // solo responde una esfera pequeña ubicada sobre cada componente.
+        try {
+            clickableObjects.length = 0;   // se descartan las áreas grandes
+
+            const HOTSPOTS = [
+                { key: 'CENITAL_CAMERA',      pos: [-4.3, 3.35, 4.8] },
+                { key: 'P10_DISPLAY',         pos: [-6.2, 2.75, 0.2] },
+                { key: 'DOOR_SENSORS_MODULE', pos: [-2.1, 1.0, 1.5] },
+                { key: 'DRIVER_DISPLAY',      pos: [-4.8, 1.1, -0.5] },
+                { key: 'STATION_LED_KIOSK',   pos: [1.5, 1.05, 5.2] },
+                { key: 'BICIPOL_STATION',     pos: [6.2, 0.15, 4.6] }
+            ];
+
+            HOTSPOTS.forEach(h => {
+                const punto = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.26, 16, 16),
+                    new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.35, depthTest: false })
+                );
+                punto.position.set(h.pos[0], h.pos[1], h.pos[2]);
+                punto.name = h.key;              // el handler busca INSPECTOR_DB[obj.name]
+                punto.renderOrder = 998;
+                sceneGaritaGroup.add(punto);
+                clickableObjects.push(punto);
+            });
+        } catch (e) { console.warn('[MoveSpol] hotspots:', e); }
+
+        // ---------- 12.2 El bus ya no deja pasajeros "botados" ----------
+        // Al despachar se retiran de la escena TODAS las figuras: las sentadas,
+        // las que iban caminando por el pasillo y las que quedaron a medio subir.
+        try {
+            function limpiarFigura(mesh) {
+                if (!mesh) return;
+                mesh.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) {
+                        if (Array.isArray(c.material)) c.material.forEach(m => m.dispose());
+                        else c.material.dispose();
+                    }
+                });
+                if (mesh.parent) mesh.parent.remove(mesh);
+                scene.remove(mesh);
+            }
+
+            const _depBase3 = triggerBusDeparture;
+            triggerBusDeparture = function () {
+                _depBase3();
+                setTimeout(() => {
+                    // Pasajeros ya sentados o de pie dentro del bus
+                    if (Array.isArray(seatedPassengers)) {
+                        seatedPassengers.forEach(p => { if (p.spot) p.spot.occupied = false; limpiarFigura(p.mesh); });
+                        seatedPassengers.length = 0;
+                    }
+                    // Pasajeros que iban caminando cuando salió el bus
+                    if (Array.isArray(activePassengers)) {
+                        activePassengers.forEach(p => limpiarFigura(p.mesh));
+                        activePassengers.length = 0;
+                    }
+                    if (Array.isArray(seatMeshes)) seatMeshes.forEach(s => s.occupied = false);
+                    if (Array.isArray(standingSpots)) standingSpots.forEach(s => s.occupied = false);
+                    currentPax = 0;
+                    updateApp();
+                }, 900);
+            };
+        } catch (e) { console.warn('[MoveSpol] limpieza de despacho:', e); }
+
+        // ---------- 12.3 Una fila por bus: Express primero, luego Completa ----------
+        // Se ven las dos filas, pero solo se consume la del bus que está en turno:
+        // al salir el Express, la fila Completa pasa al frente para el segundo bus.
+        try {
+            window.__turnoRuta = 'EXPRESS';
+
+            window.avanzarTurnoBus = function () {
+                window.__turnoRuta = (window.__turnoRuta === 'EXPRESS') ? 'COMPLETA' : 'EXPRESS';
+                if (window.dibujarCartelRuta) window.dibujarCartelRuta(window.__turnoRuta);
+                // La fila del turno se ve completa; la otra queda en espera
+                if (window.reponerFilas) {
+                    window.reponerFilas(
+                        window.__turnoRuta === 'EXPRESS' ? 16 : 4,
+                        window.__turnoRuta === 'COMPLETA' ? 14 : 5
+                    );
+                }
+            };
+
+            // sacarDeFila ya existía: aquí se asegura que consuma la fila correcta
+            window.sacarDeFila = function () {
+                const lista = (window.__turnoRuta === 'COMPLETA')
+                    ? window.__filaCompleta : window.__filaExpress;
+                if (!Array.isArray(lista)) return false;
+                for (let i = lista.length - 1; i >= 0; i--) {
+                    if (lista[i].visible) { lista[i].visible = false; return true; }
+                }
+                return false;
+            };
+        } catch (e) { console.warn('[MoveSpol] turnos de fila:', e); }
