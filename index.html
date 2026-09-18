@@ -73,42 +73,40 @@
             </div>
         </div>
 
-        <!-- BARRA SUPERIOR: RECORRIDO GUIADO Y ACCIONES SIMPLES -->
-        <div class="absolute top-4 left-4 z-20 flex flex-wrap gap-2.5 items-center">
-
-            <!-- Control del recorrido guiado (fuera del mockup: es lo externo) -->
-            <div class="bg-white/95 backdrop-blur-md px-3 py-2 rounded-2xl border border-slate-200 shadow-lg flex items-center gap-3 text-slate-800">
-                <button id="btn-flow-start" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[12px] font-black transition shadow-sm">
-                    ▶ Ver cómo funciona
-                </button>
-                <div class="min-w-[230px]">
-                    <div class="flex items-center justify-between gap-2">
-                        <span id="flow-step-title" class="text-[11px] font-black text-slate-900 leading-tight">Listo para iniciar</span>
-                        <span id="flow-step-badge" class="text-[9px] font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded shrink-0">0 / 9</span>
-                    </div>
-                    <p id="flow-step-desc" class="text-[9.5px] text-slate-600 leading-snug mt-0.5">Muestra paso a paso cómo trabajan la cámara, los sensores, el GPS y las pantallas.</p>
-                    <div class="w-full bg-slate-200 rounded-full h-1 overflow-hidden mt-1">
-                        <div id="flow-progress" class="bg-blue-600 h-full transition-all duration-500" style="width:0%"></div>
-                    </div>
+        <!-- TÍTULO DE LA PRESENTACIÓN (sin botones: se reproduce solo) -->
+        <div class="absolute top-4 left-1/2 -translate-x-1/2 z-30 w-[640px] max-w-[90%] text-center pointer-events-none">
+            <div class="bg-slate-900/85 backdrop-blur-md rounded-2xl px-5 py-3 shadow-2xl">
+                <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-blue-300">Sistema MoveSpol · Campus Gustavo Galindo</p>
+                <h1 id="scene-title" class="text-[17px] font-black text-white leading-tight mt-0.5">Cómo funciona el sistema, paso a paso</h1>
+                <div class="w-full bg-white/15 rounded-full h-1 overflow-hidden mt-2">
+                    <div id="flow-progress" class="bg-blue-400 h-full transition-all duration-700" style="width:0%"></div>
                 </div>
             </div>
+        </div>
 
-            <div class="bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-slate-200 shadow-lg flex items-center gap-2 text-slate-800">
-                <button id="btn-in" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm">
-                    Sube un estudiante
-                </button>
-                <button id="btn-out" class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm">
-                    Baja un estudiante
-                </button>
-                <button id="btn-bulk-in" class="bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-xl text-[11px] font-bold transition shadow-sm">
-                    Sube un grupo
-                </button>
+        <!-- SUBTÍTULO DEL PASO ACTUAL (estilo video) -->
+        <div id="scene-caption" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 w-[680px] max-w-[92%] opacity-0 transition-opacity duration-500 pointer-events-none">
+            <div class="bg-slate-900/90 backdrop-blur-md rounded-2xl px-5 py-3 shadow-2xl border-l-4 border-blue-500">
+                <div class="flex items-center gap-2 mb-1">
+                    <span id="caption-step" class="text-[10px] font-black bg-blue-600 text-white px-2 py-0.5 rounded">Paso 1</span>
+                    <span id="caption-title" class="text-[13px] font-black text-white"></span>
+                </div>
+                <p id="caption-desc" class="text-[11.5px] text-slate-200 leading-snug"></p>
             </div>
+        </div>
 
-            <!-- Ocultos: se conservan para no romper el código que los usa -->
-            <button id="btn-scene-garita" class="hidden"></button>
-            <button id="btn-scene-terminal" class="hidden"></button>
-            <button id="btn-toggle-telemetry" class="hidden"></button>
+        <!-- Controles ocultos: el código los usa, pero no se muestran -->
+        <div class="hidden">
+            <button id="btn-in"></button>
+            <button id="btn-out"></button>
+            <button id="btn-bulk-in"></button>
+            <button id="btn-scene-garita"></button>
+            <button id="btn-scene-terminal"></button>
+            <button id="btn-toggle-telemetry"></button>
+            <button id="btn-flow-start"></button>
+            <span id="flow-step-title"></span>
+            <span id="flow-step-badge"></span>
+            <span id="flow-step-desc"></span>
         </div>
 
         <!-- DASHBOARD INFERIOR DE TELEMETRÍA IOT -->
@@ -222,17 +220,6 @@
     <!-- COLUMNA DERECHA: MOCKUP SMARTPHONE -->
     <div class="w-[470px] h-full bg-slate-50 border-l border-slate-300 flex flex-col items-center justify-center p-3 z-30 shrink-0 shadow-2xl overflow-hidden">
         
-        <!-- EXPLICACIÓN SUPERIOR EXTERIOR AL SMARTPHONE -->
-        <div class="w-[400px] bg-white border border-blue-200 rounded-2xl p-2.5 shadow-sm mb-2 shrink-0">
-            <div class="flex items-center gap-1.5 mb-0.5">
-                <span class="w-2 h-2 rounded-full bg-blue-600"></span>
-                <span class="text-[10px] font-black uppercase text-blue-900 tracking-wider">Aplicación Oficial Estudiantil</span>
-            </div>
-            <p class="text-[11px] text-slate-700 font-medium leading-snug">
-                Permite al estudiante visualizar el aforo neto de los 5 buses en tiempo real[cite: 2], emitir su voto de ruta prioritaria (Express vs Completa) y reservar bicicletas BiciPOL en estaciones politécnicas.
-            </p>
-        </div>
-
         <!-- SMARTPHONE -->
         <div class="w-[400px] h-[760px] bg-white rounded-[44px] shadow-2xl border-[10px] border-slate-900 overflow-hidden flex flex-col relative select-none shrink-0">
             

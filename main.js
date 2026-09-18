@@ -925,54 +925,18 @@ import * as THREE from 'three';
         // ==========================================
         let activePassengers = [];
 
-        // Modelo humanoide con torso, cabeza, brazos, piernas y mochila.
-        // Se usa tanto para los pasajeros que abordan como para las filas.
         function buildStudentGroup(opciones = {}) {
             const pGroup = new THREE.Group();
             const esVisitante = opciones.visitante === true;
             const bodyColor = esVisitante
                 ? new THREE.Color(0xf59e0b)
-                : new THREE.Color().setHSL(Math.random(), 0.55, 0.55);
-            const pielMat = new THREE.MeshStandardMaterial({ color: 0xffdbac });
-            const ropaMat = new THREE.MeshStandardMaterial({ color: bodyColor });
-            const pantalonMat = new THREE.MeshStandardMaterial({ color: 0x334155 });
-
-            const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.48, 10), ropaMat);
-            torso.position.y = 0.72; torso.castShadow = true; pGroup.add(torso);
-
-            const cabeza = new THREE.Mesh(new THREE.SphereGeometry(0.145, 16, 16), pielMat);
-            cabeza.position.y = 1.08; cabeza.castShadow = true; pGroup.add(cabeza);
-
-            // Brazos (se animan al caminar)
-            const brazoGeo = new THREE.CapsuleGeometry
-                ? new THREE.CylinderGeometry(0.048, 0.042, 0.42, 8)
-                : new THREE.CylinderGeometry(0.048, 0.042, 0.42, 8);
-            const brazoIzq = new THREE.Mesh(brazoGeo, ropaMat);
-            brazoIzq.position.set(-0.21, 0.72, 0); brazoIzq.castShadow = true; pGroup.add(brazoIzq);
-            const brazoDer = new THREE.Mesh(brazoGeo, ropaMat);
-            brazoDer.position.set(0.21, 0.72, 0); brazoDer.castShadow = true; pGroup.add(brazoDer);
-
-            // Piernas (se animan al caminar)
-            const piernaGeo = new THREE.CylinderGeometry(0.058, 0.05, 0.5, 8);
-            const piernaIzq = new THREE.Mesh(piernaGeo, pantalonMat);
-            piernaIzq.position.set(-0.08, 0.24, 0); piernaIzq.castShadow = true; pGroup.add(piernaIzq);
-            const piernaDer = new THREE.Mesh(piernaGeo, pantalonMat);
-            piernaDer.position.set(0.08, 0.24, 0); piernaDer.castShadow = true; pGroup.add(piernaDer);
-
-            // Mochila
-            const mochila = new THREE.Mesh(
-                new THREE.BoxGeometry(0.27, 0.34, 0.15),
-                new THREE.MeshStandardMaterial({ color: esVisitante ? 0x7c2d12 : 0x1e293b })
-            );
-            mochila.position.set(0, 0.74, -0.2); mochila.castShadow = true; pGroup.add(mochila);
-            const correa = new THREE.Mesh(
-                new THREE.BoxGeometry(0.22, 0.04, 0.02),
-                new THREE.MeshStandardMaterial({ color: 0x0f172a })
-            );
-            correa.position.set(0, 0.86, -0.12); pGroup.add(correa);
-
-            // Referencias para animar el caminado
-            pGroup.userData.extremidades = { brazoIzq, brazoDer, piernaIzq, piernaDer };
+                : new THREE.Color().setHSL(Math.random(), 0.6, 0.6);
+            const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.85, 8), new THREE.MeshStandardMaterial({ color: bodyColor }));
+            body.position.y = 0.42; body.castShadow = true; pGroup.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), new THREE.MeshStandardMaterial({ color: 0xffdbac }));
+            head.position.y = 0.9; head.castShadow = true; pGroup.add(head);
+            const pack = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.38, 0.18), new THREE.MeshStandardMaterial({ color: esVisitante ? 0x7c2d12 : 0x1e293b }));
+            pack.position.set(0, 0.46, -0.22); pGroup.add(pack);
             return pGroup;
         }
 
@@ -1709,24 +1673,6 @@ import * as THREE from 'three';
             };
         } catch (e) { console.warn('[MoveSpol] filas:', e); }
 
-        // ---------- 10.4 Animación de caminado (brazos y piernas) ----------
-        try {
-            (function animarExtremidades() {
-                requestAnimationFrame(animarExtremidades);
-                const t = performance.now() * 0.008;
-                if (!Array.isArray(activePassengers)) return;
-                activePassengers.forEach((p, idx) => {
-                    const ext = p.mesh && p.mesh.userData && p.mesh.userData.extremidades;
-                    if (!ext) return;
-                    const fase = t + idx;
-                    ext.piernaIzq.rotation.x = Math.sin(fase) * 0.55;
-                    ext.piernaDer.rotation.x = -Math.sin(fase) * 0.55;
-                    ext.brazoIzq.rotation.x = -Math.sin(fase) * 0.45;
-                    ext.brazoDer.rotation.x = Math.sin(fase) * 0.45;
-                });
-            })();
-        } catch (e) { console.warn('[MoveSpol] animacion extremidades:', e); }
-
         // ---------- 10.5 Visitante externo y registro por QR ----------
         try {
             window.__qrActivo = false;
@@ -1916,146 +1862,6 @@ import * as THREE from 'three';
             };
         } catch (e) { console.warn('[MoveSpol] recorrido:', e); }
 
-        // ---------- 10.7 Recorrido guiado: el flujo completo por pasos ----------
-        try {
-            const PASOS = [
-                {
-                    marcador: 1,
-                    titulo: '1 · La cámara capta cuántos estudiantes esperan',
-                    desc: 'La cámara cenital de Garita está siempre encendida. Cuenta por visión: 16 personas en la fila Express (FCNM/FCSH) y 5 en la fila Completa (FADCOM). Nadie tiene que reportar nada manualmente.',
-                    cam: [-6.5, 5.0, 10.5], target: [-3, 0.5, 4.5],
-                    aviso: 'Cámara: 16 en fila Express · 5 en fila Completa'
-                },
-                {
-                    marcador: 1,
-                    titulo: '2 · El backend decide qué ruta despachar primero',
-                    desc: 'Con ese conteo, y no con un horario fijo, el sistema determina que la demanda de las 7:00 AM está en la Zona Oeste. Resultado: sale primero la Ruta Express, evitando mandar un bus largo con pocos pasajeros.',
-                    cam: [-7.5, 4.2, 9.0], target: [-3, 0.8, 3.5],
-                    aviso: 'Decisión automática: sale primero la RUTA EXPRESS',
-                    accion: () => window.dibujarCartelRuta('EXPRESS')
-                },
-                {
-                    marcador: 2,
-                    titulo: '3 · Se activa el letrero P10 del bus',
-                    desc: 'El chofer confirma con su control RF de 433 MHz y el letrero frontal muestra el destino. Así el estudiante sabe desde lejos cuál unidad le sirve y no aborda la equivocada.',
-                    cam: [-9.0, 3.0, 5.0], target: [-4.5, 1.5, 1.0],
-                    aviso: 'Letrero P10 · RUTA EXPRESS activado'
-                },
-                {
-                    marcador: 3,
-                    titulo: '4 · El sensor S0 habilita el conteo',
-                    desc: 'S0 es un sensor magnético en la puerta. Mientras está cerrada, el conteo permanece apagado para no registrar movimientos internos. Al abrirse, habilita a S1 y S2.',
-                    cam: [-5.0, 2.4, 5.0], target: [-2.3, 1.2, 1.8],
-                    aviso: 'S0: puerta abierta · conteo habilitado'
-                },
-                {
-                    marcador: 4,
-                    titulo: '5 · S1 y S2 detectan cada estudiante que sube',
-                    desc: 'Los dos sensores ópticos están separados 20 cm. La secuencia S1 → ambos → S2 significa entrada; la inversa, salida. Un filtro de 600 ms evita que una mochila se cuente como persona.',
-                    cam: [-5.2, 2.0, 5.2], target: [-2.0, 0.8, 2.0],
-                    aviso: 'Sensores M18 contando: S1 → S2 = +1 pasajero',
-                    accion: () => {
-                        let n = 0;
-                        const subir = setInterval(() => {
-                            if (n >= 8 || currentPax >= CAPACITY) { clearInterval(subir); return; }
-                            spawnStudent('in'); n++;
-                        }, 700);
-                    },
-                    duracion: 9000
-                },
-                {
-                    marcador: 5,
-                    titulo: '6 · El dato sube y se actualiza todo en tiempo real',
-                    desc: 'El ESP32 empaqueta el aforo y lo envía por WiFi cada 15 segundos. El tótem LED del andén y la app del estudiante muestran el mismo número al instante: quien viene caminando ya sabe si alcanzará cupo.',
-                    cam: [3.5, 2.6, 8.5], target: [1.5, 1.0, 5.0],
-                    aviso: 'Aforo sincronizado: tótem LED + app Mi ESPOL'
-                },
-                {
-                    marcador: 5,
-                    titulo: '7 · Un visitante externo se registra por QR',
-                    desc: 'Quien no pertenece a la ESPOL no está en el sistema. El tótem le muestra un código QR y registra sus datos como protocolo de seguridad, sin que tenga que instalar ninguna aplicación.',
-                    cam: [4.5, 2.5, 8.5], target: [1.8, 0.8, 5.0],
-                    aviso: 'Visitante externo · registro por QR',
-                    accion: () => window.mostrarVisitante(true),
-                    duracion: 8500
-                },
-                {
-                    marcador: 6,
-                    titulo: '8 · Aforo completo, despacho y GPS activo',
-                    desc: 'Al llegar a 55 pasajeros el sistema cierra puertas y despacha sin esperar el temporizador. El módulo GPS transmite la posición cada 30 segundos, así la app muestra dónde va la unidad y cuánto falta.',
-                    cam: [-9, 4.5, 11], target: [-1, 1.0, 2.0],
-                    aviso: 'GPS activo · transmitiendo posición cada 30 s',
-                    accion: () => {
-                        window.mostrarVisitante(false);
-                        const btn = document.getElementById('btn-bulk-in');
-                        let k = 0;
-                        const llenar = setInterval(() => {
-                            if (k >= 6 || currentPax >= CAPACITY) { clearInterval(llenar); return; }
-                            if (btn) btn.click();
-                            k++;
-                        }, 500);
-                    },
-                    duracion: 9000
-                },
-                {
-                    marcador: 7,
-                    titulo: '9 · Impacto: tiempo, CO₂ y seguridad',
-                    desc: 'Cada unidad sale llena y por la ruta que la demanda pide: menos viajes vacíos, menos CO₂ y menos espera. BiciPOL cubre los trayectos cortos sin emisiones, y el registro de visitantes más los datos de aforo dan trazabilidad a toda la operación.',
-                    cam: [-10, 6, 14], target: [-2, 1, 3],
-                    aviso: 'Sistema integrado · menos espera y menos CO₂'
-                }
-            ];
-
-            const elBadge = document.getElementById('flow-step-badge');
-            const elTitulo = document.getElementById('flow-step-title');
-            const elDesc = document.getElementById('flow-step-desc');
-            const elProgreso = document.getElementById('flow-progress');
-            const btnFlujo = document.getElementById('btn-flow-start');
-
-            let pasoActual = -1;
-            let temporizadorFlujo = null;
-
-            function pintarPaso(i) {
-                const p = PASOS[i];
-                if (elBadge) elBadge.textContent = `${i + 1} / ${PASOS.length}`;
-                if (elTitulo) elTitulo.textContent = p.titulo;
-                if (elDesc) elDesc.textContent = p.desc;
-                if (elProgreso) elProgreso.style.width = `${((i + 1) / PASOS.length) * 100}%`;
-
-                // Ilumina en la escena el componente del que habla este paso
-                if (p.marcador && window.resaltarMarcador) window.resaltarMarcador(p.marcador);
-                // Encuadre de cámara hacia ese componente
-                if (p.cam) camera.position.set(p.cam[0], p.cam[1], p.cam[2]);
-                if (p.target) controls.target.set(p.target[0], p.target[1], p.target[2]);
-                // Aviso flotante sobre la escena
-                if (p.aviso && window.mostrarAvisoEscena) window.mostrarAvisoEscena(p.aviso);
-
-                if (p.accion) { try { p.accion(); } catch (err) { console.warn('paso', i, err); } }
-            }
-
-            function siguientePaso() {
-                pasoActual++;
-                if (pasoActual >= PASOS.length) {
-                    if (btnFlujo) btnFlujo.textContent = '▶ Ver de nuevo';
-                    if (window.resaltarMarcador) window.resaltarMarcador(0); // apaga todos
-                    pasoActual = -1;
-                    return;
-                }
-                pintarPaso(pasoActual);
-                const duracion = PASOS[pasoActual].duracion || 7000;
-                temporizadorFlujo = setTimeout(siguientePaso, duracion);
-            }
-
-            if (btnFlujo) {
-                btnFlujo.addEventListener('click', () => {
-                    if (temporizadorFlujo) clearTimeout(temporizadorFlujo);
-                    pasoActual = -1;
-                    btnFlujo.textContent = '■ Reiniciar';
-                    siguientePaso();
-                });
-            }
-        } catch (e) { console.warn('[MoveSpol] flujo guiado:', e); }
-
         // ---------- 10.8 Segunda unidad en andén (la que sale después) ----------
         // Muestra el relevo: mientras U1 se llena, U2 espera detrás con su propio
         // letrero de ruta y movimiento de pasajeros subiendo y bajando.
@@ -2111,15 +1917,6 @@ import * as THREE from 'three';
                     const zDestino = g.subiendo ? 3.4 - ciclo * 1.7 : 1.7 + ciclo * 1.7;
                     g.mesh.position.z = zDestino;
                     g.mesh.rotation.y = g.subiendo ? Math.PI : 0;
-                    // Piernas y brazos en movimiento
-                    const ext = g.mesh.userData && g.mesh.userData.extremidades;
-                    if (ext) {
-                        const paso = performance.now() * 0.008 + i;
-                        ext.piernaIzq.rotation.x = Math.sin(paso) * 0.5;
-                        ext.piernaDer.rotation.x = -Math.sin(paso) * 0.5;
-                        ext.brazoIzq.rotation.x = -Math.sin(paso) * 0.4;
-                        ext.brazoDer.rotation.x = Math.sin(paso) * 0.4;
-                    }
                 });
             })();
 
@@ -2130,3 +1927,185 @@ import * as THREE from 'three';
                 if (window.dibujarCartelRelevo) window.dibujarCartelRelevo();
             };
         } catch (e) { console.warn('[MoveSpol] bus de relevo:', e); }
+
+        // ==========================================================
+        // 11. PRESENTACIÓN CINEMÁTICA (se reproduce sola, sin botones)
+        //     Cada paso: acerca la cámara al componente, muestra SOLO su
+        //     cartel y su descripción, y luego vuelve a la vista general.
+        // ==========================================================
+        try {
+            const elTitulo  = document.getElementById('scene-title');
+            const elCaption = document.getElementById('scene-caption');
+            const elPaso    = document.getElementById('caption-step');
+            const elCapTit  = document.getElementById('caption-title');
+            const elCapDesc = document.getElementById('caption-desc');
+            const elProg    = document.getElementById('flow-progress');
+
+            // --- Cámara con movimiento suave (efecto de video) ---
+            let camAnim = null;
+            function volarCamara(pos, target, ms = 2200) {
+                camAnim = {
+                    p0: camera.position.clone(), p1: new THREE.Vector3(pos[0], pos[1], pos[2]),
+                    t0: controls.target.clone(), t1: new THREE.Vector3(target[0], target[1], target[2]),
+                    ini: performance.now(), dur: ms
+                };
+            }
+            (function loopCam() {
+                requestAnimationFrame(loopCam);
+                if (!camAnim) return;
+                const k = Math.min(1, (performance.now() - camAnim.ini) / camAnim.dur);
+                const e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+                camera.position.lerpVectors(camAnim.p0, camAnim.p1, e);
+                controls.target.lerpVectors(camAnim.t0, camAnim.t1, e);
+                if (k >= 1) camAnim = null;
+            })();
+
+            const VISTA_GENERAL = { pos: [-11, 6.5, 15], tgt: [-1, 0.8, 3] };
+
+            // --- Solo se ve el cartel del paso activo ---
+            function soloMarcador(nums) {
+                if (!window.__marcadores) return;
+                Object.keys(window.__marcadores).forEach(k => {
+                    const activo = Array.isArray(nums) ? nums.includes(Number(k)) : Number(k) === nums;
+                    const m = window.__marcadores[k];
+                    m.sprite.visible = activo;
+                    m.activar(activo);
+                });
+            }
+            soloMarcador([]);   // al inicio, ningún cartel
+
+            function mostrarCaption(n, total, titulo, desc) {
+                if (elPaso) elPaso.textContent = `Paso ${n} de ${total}`;
+                if (elCapTit) elCapTit.textContent = titulo;
+                if (elCapDesc) elCapDesc.textContent = desc;
+                if (elCaption) elCaption.classList.remove('opacity-0');
+            }
+            function ocultarCaption() { if (elCaption) elCaption.classList.add('opacity-0'); }
+
+            // --- Guion de la presentación ---
+            const ESCENAS = [
+                {
+                    titulo: 'La parada Garita a las 7:00 AM',
+                    desc: 'Dos filas esperan: la mayoría va a FCNM y FCSH (trayecto corto), y un grupo menor va a FADCOM, al otro lado del lago. Veamos cómo el sistema decide qué hacer.',
+                    marcadores: [], vista: VISTA_GENERAL, dur: 6500
+                },
+                {
+                    titulo: 'La cámara cenital cuenta la fila',
+                    desc: 'Desde arriba, sin que nadie se tape entre sí, la cámara cuenta a quienes esperan. Detecta 16 personas hacia la Zona Oeste y 5 hacia FADCOM.',
+                    marcadores: [1], vista: { pos: [-5.5, 5.2, 8.5], tgt: [-4.3, 1.5, 4.8] }, dur: 7500,
+                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Detectando: 16 + 5 personas'); }
+                },
+                {
+                    titulo: 'Caso A · Demanda alta: sale la Ruta Express',
+                    desc: 'El algoritmo compara el conteo con el aforo de 55. Con 16 personas concentradas hacia FCNM, conviene despachar primero la Express: llena el bus rápido y evita un recorrido largo casi vacío.',
+                    marcadores: [1, 2], vista: { pos: [-8.5, 4.0, 7.5], tgt: [-4.5, 1.5, 2.5] }, dur: 8000,
+                    accion: () => {
+                        if (window.dibujarCartelRuta) window.dibujarCartelRuta('EXPRESS');
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Aforo estimado 16/55 · alta concentración → EXPRESS');
+                    }
+                },
+                {
+                    titulo: 'Caso B · Demanda baja: se espera o sale la Completa',
+                    desc: 'Si la cámara detecta pocas personas, el sistema no despacha en vacío: mantiene la unidad en andén o la manda por la Ruta Completa, que recoge en todas las paradas. Así se evita quemar combustible sin pasajeros.',
+                    marcadores: [1, 2], vista: { pos: [-8.5, 4.0, 7.5], tgt: [-4.5, 1.5, 2.5] }, dur: 8000,
+                    accion: () => {
+                        if (window.reponerFilas) window.reponerFilas(4, 3);
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Aforo estimado 7/55 · baja demanda → esperar / COMPLETA');
+                    }
+                },
+                {
+                    titulo: 'El letrero P10 anuncia la ruta',
+                    desc: 'El chofer confirma con su control de radiofrecuencia y el letrero frontal muestra el destino. El estudiante sabe desde lejos qué unidad le sirve y no aborda la equivocada.',
+                    marcadores: [2], vista: { pos: [-9.5, 2.8, 4.0], tgt: [-5.5, 1.8, 0.5] }, dur: 7000,
+                    accion: () => {
+                        if (window.reponerFilas) window.reponerFilas(16, 5);
+                        if (window.dibujarCartelRuta) window.dibujarCartelRuta('EXPRESS');
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Letrero P10 · RUTA EXPRESS');
+                    }
+                },
+                {
+                    titulo: 'Sensor S0: la puerta habilita el conteo',
+                    desc: 'S0 es un sensor magnético en la puerta. Cerrada, el conteo está apagado para no registrar movimientos internos. Al abrirse, enciende a S1 y S2.',
+                    marcadores: [3], vista: { pos: [-4.5, 2.6, 4.5], tgt: [-2.3, 1.4, 1.8] }, dur: 7000,
+                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('S0 = puerta abierta · conteo ON'); }
+                },
+                {
+                    titulo: 'S1 y S2 forman el vector de dirección',
+                    desc: 'Los dos sensores están separados 20 cm. El sistema lee un par de bits: [0,0] → [1,0] → [1,1] → [0,1] → [0,0] significa ENTRADA. En orden inverso, salida. Un filtro de 600 ms evita contar una mochila como persona.',
+                    marcadores: [4], vista: { pos: [-4.2, 1.9, 4.2], tgt: [-2.1, 0.9, 1.6] }, dur: 11000,
+                    accion: () => {
+                        let n = 0;
+                        const t = setInterval(() => {
+                            if (n >= 6 || currentPax >= CAPACITY) { clearInterval(t); return; }
+                            spawnStudent('in'); n++;
+                            if (window.mostrarAvisoEscena) {
+                                window.mostrarAvisoEscena(`S1 → ambos → S2 = +1 · aforo ${currentPax}/${CAPACITY}`);
+                            }
+                        }, 1400);
+                    }
+                },
+                {
+                    titulo: 'Las tres pantallas muestran el mismo dato',
+                    desc: 'El ESP32 envía el aforo por WiFi. La pantalla del chofer indica cuántos lleva y cuándo cerrar; el letrero del bus muestra la ruta; y el tótem del andén publica el conteo y qué unidad sale primero, para quien no tiene la app.',
+                    marcadores: [3, 5], vista: { pos: [2.5, 2.8, 8.0], tgt: [0.5, 1.2, 4.0] }, dur: 9000,
+                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('Chofer · letrero del bus · tótem del andén'); }
+                },
+                {
+                    titulo: 'Aforo completo y despacho automático',
+                    desc: 'Al llegar a 55 pasajeros el sistema cierra puertas y despacha sin esperar el temporizador. El GPS empieza a transmitir la posición cada 30 segundos.',
+                    marcadores: [6], vista: { pos: [-10, 4.5, 10], tgt: [-1.5, 1.2, 2.0] }, dur: 9000,
+                    accion: () => {
+                        const b = document.getElementById('btn-bulk-in');
+                        let k = 0;
+                        const t = setInterval(() => {
+                            if (k >= 6 || currentPax >= CAPACITY) { clearInterval(t); return; }
+                            if (b) b.click(); k++;
+                        }, 600);
+                        if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('GPS transmitiendo cada 30 s');
+                    }
+                },
+                {
+                    titulo: 'La siguiente unidad toma la otra ruta',
+                    desc: 'Mientras la primera sale, la unidad de relevo ya espera en el andén con su letrero puesto. Así quien va a FADCOM siempre sabe que la Completa viene detrás de la Express.',
+                    marcadores: [], vista: { pos: [6, 4.5, 12], tgt: [8, 1.0, 2.0] }, dur: 8000,
+                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena('U2 en andén · ruta contraria lista'); }
+                },
+                {
+                    titulo: 'Si llega alguien externo a la ESPOL',
+                    desc: 'Un visitante no aparece en el sistema. El tótem le muestra un código QR: lo escanea, registra sus datos y queda autorizado. Es el protocolo de seguridad, sin instalar ninguna aplicación.',
+                    marcadores: [5], vista: { pos: [4.2, 2.4, 8.2], tgt: [1.8, 1.0, 5.0] }, dur: 10000,
+                    accion: () => { if (window.mostrarVisitante) window.mostrarVisitante(true); }
+                },
+                {
+                    titulo: 'BiciPOL cubre los trayectos cortos',
+                    desc: 'Para distancias cortas entre facultades, la estación de bicicletas evita ocupar un cupo del bus y no genera emisiones. Garita y Rectorado mantienen el mismo número de anclajes.',
+                    marcadores: [7], vista: { pos: [8.5, 2.2, 8.0], tgt: [6.2, 0.4, 4.6] }, dur: 8000,
+                    accion: () => { if (window.mostrarVisitante) window.mostrarVisitante(false); }
+                },
+                {
+                    titulo: 'Resultado: menos espera y menos CO₂',
+                    desc: 'Cada unidad sale llena y por la ruta que la demanda pide. Se eliminan los viajes vacíos, baja el tiempo de espera y todo queda registrado: aforo real por parada y visitantes identificados.',
+                    marcadores: [], vista: VISTA_GENERAL, dur: 9000,
+                    accion: () => { if (window.mostrarAvisoEscena) window.mostrarAvisoEscena(null); }
+                }
+            ];
+
+            let idx = -1;
+            function siguienteEscena() {
+                idx++;
+                if (idx >= ESCENAS.length) { idx = 0; }      // se repite en bucle
+                const e = ESCENAS[idx];
+
+                if (elTitulo) elTitulo.textContent = e.titulo;
+                if (elProg) elProg.style.width = `${((idx + 1) / ESCENAS.length) * 100}%`;
+                mostrarCaption(idx + 1, ESCENAS.length, e.titulo, e.desc);
+                soloMarcador(e.marcadores || []);
+                if (e.vista) volarCamara(e.vista.pos, e.vista.tgt, 2200);
+                if (e.accion) { try { e.accion(); } catch (err) { console.warn('escena', idx, err); } }
+
+                setTimeout(siguienteEscena, e.dur || 7000);
+            }
+
+            // Arranca sola, sin que el usuario toque nada
+            setTimeout(siguienteEscena, 1800);
+        } catch (e) { console.warn('[MoveSpol] presentación:', e); }
